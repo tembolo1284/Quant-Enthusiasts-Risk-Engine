@@ -1,7 +1,7 @@
 from setuptools import setup, Extension
 import pybind11
 
-cpp_args = ['-std=c++17', '-Wall', '-Wextra', '-pedantic']
+cpp_args = ['-std=c++17', '-Wall', '-pedantic']
 
 ext_modules = [
     Extension(

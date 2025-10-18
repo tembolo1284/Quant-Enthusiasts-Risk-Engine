@@ -1,0 +1,10 @@
+^C:\USERS\USER\PROJECTS\QUANTENTHUSIASTS\QUANT-ENTHUSIASTS-RISK-ENGINE\CPP_ENGINE\BUILD\CMAKEFILES\FD896FAC64512E00E10CC5D18BB18BAE\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SC:/Users/User/Projects/QuantEnthusiasts/Quant-Enthusiasts-Risk-Engine/cpp_engine -BC:/Users/User/Projects/QuantEnthusiasts/Quant-Enthusiasts-Risk-Engine/cpp_engine/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file C:/Users/User/Projects/QuantEnthusiasts/Quant-Enthusiasts-Risk-Engine/cpp_engine/build/QuantRiskEngine.sln
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
