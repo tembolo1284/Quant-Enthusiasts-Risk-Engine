@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quant Enthusiasts Risk Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        @import url('https://rsms.me/inter/inter.css');
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-cyan-400">Quant Enthusiasts</h1>
+            <h2 class="text-2xl md:text-3xl font-light text-gray-400">Community Risk Engine v1.0</h2>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-1 bg-gray-800 p-6 rounded-lg shadow-2xl">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">1. Define Market Data</h3>
+                <div id="market-data-container" class="space-y-4">
+                    <!-- Market data fields will be dynamically added here -->
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 bg-gray-800 p-6 rounded-lg shadow-2xl">
+                <h3 class="text-2xl font-semibold mb-4 border-b border-gray-700 pb-2">2. Build Portfolio</h3>
+                <form id="instrument-form" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6 items-end">
+                    <div>
+                        <label for="asset-id" class="block text-sm font-medium text-gray-400">Asset ID</label>
+                        <input type="text" id="asset-id" value="STOCK" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500 text-white p-2">
+                    </div>
+                    <div>
+                        <label for="type" class="block text-sm font-medium text-gray-400">Type</label>
+                        <select id="type" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500 text-white p-2">
+                            <option>Call</option>
+                            <option>Put</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="quantity" class="block text-sm font-medium text-gray-400">Quantity</label>
+                        <input type="number" id="quantity" value="100" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500 text-white p-2">
+                    </div>
+                    <div>
+                        <label for="strike" class="block text-sm font-medium text-gray-400">Strike</label>
+                        <input type="number" id="strike" value="105" step="0.01" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500 text-white p-2">
+                    </div>
+                    <div>
+                        <label for="expiry" class="block text-sm font-medium text-gray-400">Expiry (Years)</label>
+                        <input type="number" id="expiry" value="0.5" step="0.01" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm focus:ring-cyan-500 focus:border-cyan-500 text-white p-2">
+                    </div>
+                    <button type="submit" class="sm:col-span-2 md:col-span-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-4 rounded-md transition duration-300 h-10">Add to Portfolio</button>
+                </form>
+                
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-gray-700 rounded-md">
+                        <thead>
+                            <tr>
+                                <th class="py-2 px-4 text-left">Asset</th>
+                                <th class="py-2 px-4 text-left">Type</th>
+                                <th class="py-2 px-4 text-right">Quantity</th>
+                                <th class="py-2 px-4 text-right">Strike</th>
+                                <th class="py-2 px-4 text-right">Expiry</th>
+                                <th class="py-2 px-4 text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="portfolio-table">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="lg:col-span-3 bg-gray-800 p-6 rounded-lg shadow-2xl">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                    <h3 class="text-2xl font-semibold pb-2">3. Risk Analysis Results</h3>
+                    <button id="calculate-risk-btn" class="w-full md:w-auto bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-md transition duration-300">
+                        Calculate Portfolio Risk
+                    </button>
+                </div>
+                <div id="results-container" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-center hidden">
+                     <!-- Results will be injected here -->
+                </div>
+                <div id="spinner" class="hidden flex justify-center items-center p-8">
+                    <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-cyan-500"></div>
+                </div>
+                <div id="error-message" class="hidden text-center p-4 bg-red-900/50 text-red-300 rounded-md"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let portfolio = [];
+        let marketData = {};
+
+        const instrumentForm = document.getElementById('instrument-form');
+        const assetIdInput = document.getElementById('asset-id');
+        const portfolioTable = document.getElementById('portfolio-table');
+        const marketDataContainer = document.getElementById('market-data-container');
+        const calculateBtn = document.getElementById('calculate-risk-btn');
+        const resultsContainer = document.getElementById('results-container');
+        const spinner = document.getElementById('spinner');
+        const errorMessage = document.getElementById('error-message');
+
+        const updateMarketDataFields = () => {
+            const neededAssets = new Set(portfolio.map(p => p.asset_id));
+            if (neededAssets.size === 0) {
+                 neededAssets.add("STOCK");
+            }
+
+            marketDataContainer.innerHTML = '';
+            
+            const currentMarketData = { ...marketData };
+            marketData = {};
+
+            neededAssets.forEach(assetId => {
+                const existingData = currentMarketData[assetId] || { spot: 100, rate: 0.05, vol: 0.20 };
+                marketData[assetId] = existingData;
+
+                const wrapper = document.createElement('div');
+                wrapper.className = 'p-4 bg-gray-700 rounded-lg';
+                wrapper.innerHTML = `
+                    <h4 class="text-lg font-bold text-cyan-400 mb-2">${assetId}</h4>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label for="spot-${assetId}" class="text-xs text-gray-400">Spot</label>
+                            <input type="number" data-asset="${assetId}" data-field="spot" value="${existingData.spot}" class="mt-1 w-full bg-gray-600 text-white p-1 rounded-md text-sm">
+                        </div>
+                        <div>
+                            <label for="rate-${assetId}" class="text-xs text-gray-400">Rate</label>
+                            <input type="number" data-asset="${assetId}" data-field="rate" value="${existingData.rate}" step="0.01" class="mt-1 w-full bg-gray-600 text-white p-1 rounded-md text-sm">
+                        </div>
+                        <div>
+                            <label for="vol-${assetId}" class="text-xs text-gray-400">Vol</label>
+                            <input type="number" data-asset="${assetId}" data-field="vol" value="${existingData.vol}" step="0.01" class="mt-1 w-full bg-gray-600 text-white p-1 rounded-md text-sm">
+                        </div>
+                    </div>
+                `;
+                marketDataContainer.appendChild(wrapper);
+            });
+        };
+
+        marketDataContainer.addEventListener('input', (e) => {
+            if (e.target.matches('input[type="number"]')) {
+                const { asset, field } = e.target.dataset;
+                marketData[asset][field] = parseFloat(e.target.value);
+            }
+        });
+
+        const renderPortfolio = () => {
+            portfolioTable.innerHTML = '';
+            portfolio.forEach((instrument, index) => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-gray-600';
+                row.innerHTML = `
+                    <td class="py-2 px-4">${instrument.asset_id}</td>
+                    <td class="py-2 px-4">${instrument.type}</td>
+                    <td class="py-2 px-4 text-right">${instrument.quantity}</td>
+                    <td class="py-2 px-4 text-right">${instrument.strike}</td>
+                    <td class="py-2 px-4 text-right">${instrument.expiry}</td>
+                    <td class="py-2 px-4 text-center">
+                        <button onclick="removeInstrument(${index})" class="text-red-400 hover:text-red-300">&times;</button>
+                    </td>
+                `;
+                portfolioTable.appendChild(row);
+            });
+            updateMarketDataFields();
+        };
+
+        const removeInstrument = (index) => {
+            portfolio.splice(index, 1);
+            renderPortfolio();
+        };
+
+        instrumentForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newInstrument = {
+                asset_id: document.getElementById('asset-id').value.toUpperCase(),
+                type: document.getElementById('type').value,
+                quantity: parseInt(document.getElementById('quantity').value),
+                strike: parseFloat(document.getElementById('strike').value),
+                expiry: parseFloat(document.getElementById('expiry').value)
+            };
+            portfolio.push(newInstrument);
+            renderPortfolio();
+            instrumentForm.reset();
+            document.getElementById('asset-id').value = "STOCK";
+        });
+        
+        const formatResult = (value) => {
+            return value.toLocaleString('en-US', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+            });
+        };
+
+        calculateBtn.addEventListener('click', async () => {
+            spinner.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            
+            const payload = {
+                portfolio: portfolio,
+                market_data: marketData
+            };
+            
+            try {
+                const response = await fetch('http://127.0.0.1:5000/calculate_risk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Calculation failed');
+                }
+
+                const results = await response.json();
+                resultsContainer.innerHTML = `
+                    <div class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Total PV</p>
+                        <p class="text-2xl font-bold">${formatResult(results.total_pv)}</p>
+                    </div>
+                     <div class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Delta</p>
+                        <p class="text-2xl font-bold">${formatResult(results.total_delta)}</p>
+                    </div>
+                     <div class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Gamma</p>
+                        <p class="text-2xl font-bold">${formatResult(results.total_gamma)}</p>
+                    </div>
+                     <div class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Vega</p>
+                        <p class="text-2xl font-bold">${formatResult(results.total_vega)}</p>
+                    </div>
+                     <div class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">Theta</p>
+                        <p class="text-2xl font-bold">${formatResult(results.total_theta)}</p>
+                    </div>
+                     <div class="bg-gray-700 p-4 rounded-lg">
+                        <p class="text-sm text-gray-400">95% VaR (1-day)</p>
+                        <p class="text-2xl font-bold text-red-400">${formatResult(results.value_at_risk_95)}</p>
+                    </div>
+                `;
+                resultsContainer.classList.remove('hidden');
+
+            } catch (error) {
+                errorMessage.textContent = `Error: ${error.message}. Is the Python API server running?`;
+                errorMessage.classList.remove('hidden');
+            } finally {
+                spinner.classList.add('hidden');
+            }
+        });
+        
+        window.removeInstrument = removeInstrument;
+        renderPortfolio();
+    </script>
+</body>
+</html>
