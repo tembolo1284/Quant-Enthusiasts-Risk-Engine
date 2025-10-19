@@ -1,6 +1,11 @@
 #include "BlackScholes.h"
 #include <cmath>
-#include <corecrt_math_defines.h>
+// works on windows only. Commenting out for now and adding M_PI for cross platform compatibilty with linux and mac os
+// #include <corecrt_math_defines.h>
+
+#ifndef M_PI
+#define M_PI3.14159265358979323846
+#endif
 #include <algorithm>
 
 double BlackScholes::N(double z) {
