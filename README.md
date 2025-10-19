@@ -53,7 +53,7 @@ mkdir -p cpp_engine/build
 cd cpp_engine/build
 cmake ..
 cmake --build .
-./RiskEngine
+./risk-engine
 ```
 
 ### Python API
