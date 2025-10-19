@@ -48,12 +48,14 @@ cd Quant-Enthusiasts-Risk-Engine
 
 ### Build C++ Engine
 
+If you are using GCC or Clang, comment out the line `#include <corecrt_math_defines.h>` in the source file before building. This header is only needed on Windows with MSVC; other compilers already provide the required math constants.
+
 ```bash
 mkdir -p cpp_engine/build
 cd cpp_engine/build
 cmake ..
 cmake --build .
-./RiskEngine
+./risk-engine
 ```
 
 ### Python API
