@@ -57,6 +57,43 @@ cmake ..
 cmake --build .
 ./risk-engine
 ```
+#### Using the build script (Recommended)
+The easiest way to build and test the C++ engine:
+```bash
+cd cpp_engine
+chmod +x build.sh
+./build.sh --all    # Clean, build, and run all tests
+```
+
+Available build options:
+```bash
+./build.sh                      # Clean and build (default)
+./build.sh --compiler clang     # Build with clang
+./build.sh --test               # Build and run all tests
+./build.sh --test blackscholes  # Run specific test
+./build.sh --clean              # Clean build directory
+./build.sh --help               # Show all options
+```
+
+### Testing
+
+The C++ engine includes a comprehensive test suite with no external dependencies. Tests cover:
+- **BlackScholes**: Option pricing and Greeks calculations
+- **Portfolio**: Portfolio management and aggregation
+- **RiskEngine**: Risk metrics including VaR
+
+Run all tests:
+```bash
+cd cpp_engine
+./build.sh --test
+```
+
+Run individual test suites:
+```bash
+./build.sh --test blackscholes  # Black-Scholes model tests
+./build.sh --test portfolio     # Portfolio management tests
+./build.sh --test risk_engine   # Risk engine tests
+```
 
 ### Python API
 
