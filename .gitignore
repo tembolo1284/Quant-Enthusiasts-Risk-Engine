@@ -36,6 +36,33 @@ build_cpp
 /python_api/dist
 /python_api/quant_risk_engine.egg-info
 
+# C++ Build artifacts
+cpp_engine/build/
+cpp_engine/cmake-build-*/
+*.o
+*.obj
+*.exe
+*.out
+*.a
+*.so
+*.dylib
+*.dll
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Compiled executables
+risk_engine
+test_blackscholes
+test_portfolio
+test_risk_engine
+test_binomial_tree
+
 # macOS
 .DS_Store
 

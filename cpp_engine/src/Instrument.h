@@ -34,4 +34,23 @@ public:
     std::string underlying_asset_id;
 };
 
+class AmericanOption : public Instrument {
+public:
+    AmericanOption(OptionType type, double strike, double time_to_expiry, 
+                   std::string asset_id, int tree_steps = 100);
+    
+    double price(const MarketData& md) const override;
+    double delta(const MarketData& md) const override;
+    double gamma(const MarketData& md) const override;
+    double vega(const MarketData& md) const override;
+    double theta(const MarketData& md) const override;
+    std::string getAssetId() const override;
+    
+    OptionType option_type;
+    double strike_price;
+    double time_to_expiry_years;
+    std::string underlying_asset_id;
+    int binomial_steps;
+};
+
 #endif

@@ -38,6 +38,7 @@ add_executable(test_portfolio
     src/Portfolio.cpp
     src/Instrument.cpp
     src/utils/BlackScholes.cpp
+    src/utils/BinomialTree.cpp
 )
 target_include_directories(test_portfolio PRIVATE ${SOURCE_DIR})
 add_test(NAME PortfolioTests COMMAND test_portfolio)
@@ -50,15 +51,28 @@ add_executable(test_risk_engine
     src/Instrument.cpp
     src/MarketData.cpp
     src/utils/BlackScholes.cpp
+    src/utils/BinomialTree.cpp
 )
 target_include_directories(test_risk_engine PRIVATE ${SOURCE_DIR})
 add_test(NAME RiskEngineTests COMMAND test_risk_engine)
+
+# Binomial Tree tests
+add_executable(test_binomial_tree
+    tests/test_binomial_tree.cpp
+    src/Instrument.cpp
+    src/Portfolio.cpp
+    src/utils/BinomialTree.cpp
+    src/utils/BlackScholes.cpp
+)
+target_include_directories(test_binomial_tree PRIVATE ${SOURCE_DIR})
+add_test(NAME BinomialTreeTests COMMAND test_binomial_tree)
 
 # Convenience target to run all tests
 add_custom_target(run_all_tests
     COMMAND test_blackscholes
     COMMAND test_portfolio
     COMMAND test_risk_engine
-    DEPENDS test_blackscholes test_portfolio test_risk_engine
+    COMMAND test_binomial_tree 
+    DEPENDS test_blackscholes test_portfolio test_risk_engine test_binomial_tree
     COMMENT "Running all tests..."
 )

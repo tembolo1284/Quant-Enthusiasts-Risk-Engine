@@ -28,6 +28,7 @@ show_help() {
     echo "  --test              Build (if needed) and run all tests"
     echo "  --test-all          Build (if needed) and run all tests"
     echo "  --test <name>       Build (if needed) and run specific test"
+    echo "                      (blackscholes, portfolio, risk_engine, or binomial_tree)"
     echo "  --all               Clean, build, and run all tests"
     echo ""
     echo "Default (no options): Clean and build everything"
@@ -40,6 +41,7 @@ show_help() {
     echo "  ./build.sh --test                 # Build and run all tests"
     echo "  ./build.sh --test-all             # Build and run all tests"
     echo "  ./build.sh --test blackscholes    # Build and run specific test"
+    echo "  ./build.sh --test binomial_tree   # Build and run binomial tree tests"
     echo "  ./build.sh --compiler clang --test # Build with clang and test"
     echo "  ./build.sh --clean                # Just clean"
 }
@@ -109,6 +111,7 @@ run_tests() {
             BS_RESULT=0
             PORT_RESULT=0
             RE_RESULT=0
+            BT_RESULT=0
             
             if [ -f "./test_blackscholes" ]; then
                 echo -e "${YELLOW}=== BlackScholes Tests ===${NC}"
@@ -131,7 +134,14 @@ run_tests() {
             fi
             echo ""
             
-            if [ $BS_RESULT -eq 0 ] && [ $PORT_RESULT -eq 0 ] && [ $RE_RESULT -eq 0 ]; then
+            if [ -f "./test_binomial_tree" ]; then
+                echo -e "${YELLOW}=== Binomial Tree Tests ===${NC}"
+                ./test_binomial_tree
+                BT_RESULT=$?
+            fi
+            echo ""
+            
+            if [ $BS_RESULT -eq 0 ] && [ $PORT_RESULT -eq 0 ] && [ $RE_RESULT -eq 0 ] && [ $BT_RESULT -eq 0 ]; then
                 echo -e "${GREEN}✓ All tests passed${NC}"
             else
                 echo -e "${RED}✗ Some tests failed${NC}"
@@ -190,9 +200,26 @@ run_tests() {
                 exit 1
             fi
             ;;
+        "binomial_tree")
+            echo -e "${YELLOW}Running Binomial Tree tests...${NC}"
+            if [ -f "./test_binomial_tree" ]; then
+                ./test_binomial_tree
+                if [ $? -eq 0 ]; then
+                    echo -e "${GREEN}✓ Binomial Tree tests passed${NC}"
+                else
+                    echo -e "${RED}✗ Binomial Tree tests failed${NC}"
+                    cd ..
+                    exit 1
+                fi
+            else
+                echo -e "${RED}✗ test_binomial_tree not found${NC}"
+                cd ..
+                exit 1
+            fi
+            ;;
         *)
             echo -e "${RED}✗ Unknown test: $TEST_NAME${NC}"
-            echo "Available tests: all, blackscholes, portfolio, risk_engine"
+            echo "Available tests: all, blackscholes, portfolio, risk_engine, binomial_tree"
             cd ..
             exit 1
             ;;

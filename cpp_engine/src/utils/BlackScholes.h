@@ -11,6 +11,14 @@ namespace BlackScholes {
     double vega(double S, double K, double r, double T, double sigma);
     double callTheta(double S, double K, double r, double T, double sigma);
     double putTheta(double S, double K, double r, double T, double sigma);
+
+    double impliedVolatilityCall(double S, double K, double r, double T, double market_price, 
+                                  double initial_guess = 0.3, double tolerance = 1e-6, 
+                                  int max_iterations = 100);
+
+    double impliedVolatilityPut(double S, double K, double r, double T, double market_price,
+                                 double initial_guess = 0.3, double tolerance = 1e-6,
+                                 int max_iterations = 100);
 }
 
 #endif

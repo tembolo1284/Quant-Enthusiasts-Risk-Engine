@@ -170,6 +170,84 @@ void test_theta(TestSuite& suite) {
     });
 }
 
+void test_implied_volatility(TestSuite& suite) {
+    suite.run_test("Implied vol - call option round trip", [&]() {
+        // Given known parameters, calculate price, then recover volatility
+        double S = 100.0, K = 100.0, r = 0.05, T = 1.0, sigma = 0.2;
+        double market_price = BlackScholes::callPrice(S, K, r, T, sigma);
+        
+        // Calculate implied volatility
+        double implied_vol = BlackScholes::impliedVolatilityCall(S, K, r, T, market_price);
+        
+        // Should recover original volatility
+        suite.assert_equal(sigma, implied_vol, 1e-4, "Implied vol call");
+    });
+    
+    suite.run_test("Implied vol - put option round trip", [&]() {
+        double S = 100.0, K = 100.0, r = 0.05, T = 1.0, sigma = 0.25;
+        double market_price = BlackScholes::putPrice(S, K, r, T, sigma);
+        
+        double implied_vol = BlackScholes::impliedVolatilityPut(S, K, r, T, market_price);
+        
+        suite.assert_equal(sigma, implied_vol, 1e-4, "Implied vol put");
+    });
+    
+    suite.run_test("Implied vol - ITM call", [&]() {
+        double S = 110.0, K = 100.0, r = 0.05, T = 1.0, sigma = 0.3;
+        double market_price = BlackScholes::callPrice(S, K, r, T, sigma);
+        
+        double implied_vol = BlackScholes::impliedVolatilityCall(S, K, r, T, market_price);
+        
+        suite.assert_equal(sigma, implied_vol, 1e-4, "Implied vol ITM call");
+    });
+    
+    suite.run_test("Implied vol - OTM put", [&]() {
+        double S = 110.0, K = 100.0, r = 0.05, T = 1.0, sigma = 0.35;
+        double market_price = BlackScholes::putPrice(S, K, r, T, sigma);
+        
+        double implied_vol = BlackScholes::impliedVolatilityPut(S, K, r, T, market_price);
+        
+        suite.assert_equal(sigma, implied_vol, 1e-4, "Implied vol OTM put");
+    });
+    
+    suite.run_test("Implied vol - invalid price (too low)", [&]() {
+        // Market price below intrinsic value should return -1
+        double S = 110.0, K = 100.0, r = 0.05, T = 1.0;
+        double invalid_price = 5.0; // Way below intrinsic value of ~10
+        
+        double implied_vol = BlackScholes::impliedVolatilityCall(S, K, r, T, invalid_price);
+        
+        suite.assert_equal(-1.0, implied_vol, 1e-10, "Invalid price");
+    });
+    
+    suite.run_test("Implied vol - near expiry", [&]() {
+        double S = 100.0, K = 100.0, r = 0.05, T = 0.1, sigma = 0.4;
+        double market_price = BlackScholes::callPrice(S, K, r, T, sigma);
+        
+        double implied_vol = BlackScholes::impliedVolatilityCall(S, K, r, T, market_price);
+        
+        suite.assert_equal(sigma, implied_vol, 1e-3, "Near expiry");
+    });
+    
+    suite.run_test("Implied vol - high volatility", [&]() {
+        double S = 100.0, K = 100.0, r = 0.05, T = 1.0, sigma = 0.8;
+        double market_price = BlackScholes::callPrice(S, K, r, T, sigma);
+        
+        double implied_vol = BlackScholes::impliedVolatilityCall(S, K, r, T, market_price);
+        
+        suite.assert_equal(sigma, implied_vol, 1e-3, "High volatility");
+    });
+    
+    suite.run_test("Implied vol - low volatility", [&]() {
+        double S = 100.0, K = 100.0, r = 0.05, T = 1.0, sigma = 0.05;
+        double market_price = BlackScholes::callPrice(S, K, r, T, sigma);
+        
+        double implied_vol = BlackScholes::impliedVolatilityCall(S, K, r, T, market_price);
+        
+        suite.assert_equal(sigma, implied_vol, 1e-4, "Low volatility");
+    });
+}
+
 int main() {
     TestSuite suite;
     
@@ -185,7 +263,8 @@ int main() {
     test_gamma(suite);
     test_vega(suite);
     test_theta(suite);
-    
+    test_implied_volatility(suite);
+   
     suite.print_summary();
     
     return suite.all_passed() ? 0 : 1;

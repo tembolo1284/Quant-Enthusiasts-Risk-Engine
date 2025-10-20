@@ -71,3 +71,96 @@ double BlackScholes::putTheta(double S, double K, double r, double T, double sig
     double term2 = r * K * std::exp(-r * T) * N(-d2);
     return (term1 + term2) / 365.0;
 }
+
+// implied vol using Newton-Raphson method
+double BlackScholes::impliedVolatilityCall(double S, double K, double r, double T, 
+                                            double market_price, double initial_guess, 
+                                            double tolerance, int max_iterations) {
+    // handle edge cases
+    if (T <= 0) return 0.0;
+    
+    // check if market price is within valid bounds
+    double intrinsic_value = std::max(0.0, S - K * std::exp(-r * T));
+    if (market_price < intrinsic_value) {
+        return -1.0; // invalid: market price below intrinsic value
+    }
+    if (market_price >= S) {
+        return -1.0; // invalid: market price too high
+    }
+    
+    double sigma = initial_guess;
+    
+    for (int i = 0; i < max_iterations; ++i) {
+        double price = callPrice(S, K, r, T, sigma);
+        double price_diff = price - market_price;
+        
+        // check for convergence
+        if (std::abs(price_diff) < tolerance) {
+            return sigma;
+        }
+        
+        // calculate vega for Newton-Raphson step
+        double option_vega = vega(S, K, r, T, sigma);
+        
+        // avoid division by very small vega
+        if (std::abs(option_vega) < 1e-10) {
+            return -1.0; // Failed to converge
+        }
+        
+        // newton-raphson update: sigma_new = sigma_old - f(sigma) / f'(sigma)
+        sigma = sigma - price_diff / option_vega;
+        
+        // keep sigma in reasonable bounds
+        if (sigma < 0.001) sigma = 0.001;
+        if (sigma > 5.0) sigma = 5.0;
+    }
+    
+    // failed to converge
+    return -1.0;
+}
+
+double BlackScholes::impliedVolatilityPut(double S, double K, double r, double T, 
+                                           double market_price, double initial_guess,
+                                           double tolerance, int max_iterations) {
+    // handle edge cases
+    if (T <= 0) return 0.0;
+    
+    // check if market price is within valid bounds
+    double intrinsic_value = std::max(0.0, K * std::exp(-r * T) - S);
+    if (market_price < intrinsic_value) {
+        return -1.0; // invalid: market price below intrinsic value
+    }
+    if (market_price >= K * std::exp(-r * T)) {
+        return -1.0; // invalid: market price too high
+    }
+    
+    double sigma = initial_guess;
+    
+    for (int i = 0; i < max_iterations; ++i) {
+        double price = putPrice(S, K, r, T, sigma);
+        double price_diff = price - market_price;
+        
+        // check for convergence
+        if (std::abs(price_diff) < tolerance) {
+            return sigma;
+        }
+        
+        // calculate vega for Newton-Raphson step
+        double option_vega = vega(S, K, r, T, sigma);
+        
+        // avoid division by very small vega
+        if (std::abs(option_vega) < 1e-10) {
+            return -1.0; // Failed to converge
+        }
+        
+        // newton-raphson update
+        sigma = sigma - price_diff / option_vega;
+        
+        // keep sigma in reasonable bounds
+        if (sigma < 0.001) sigma = 0.001;
+        if (sigma > 5.0) sigma = 5.0;
+    }
+    
+    // failed to converge
+    return -1.0;
+}
