@@ -104,7 +104,8 @@ Quant-Enthusiasts-Risk-Engine/
 │   │   ├── utils/              # Pricing models
 │   │   │   ├── BlackScholes.*
 │   │   │   ├── BinomialTree.*
-│   │   │   └── JumpDiffusion.*
+│   │   │   ├── JumpDiffusion.*
+│   │   │   └── ImpliedVolatilitySurface.*
 │   │   ├── Instrument.*        # Option instruments
 │   │   ├── MarketData.*        # Market data handling
 │   │   ├── Portfolio.*         # Portfolio management
