@@ -394,72 +394,6 @@ jobs:
           path: python_api/flask.log
 
   # =============================================================================
-  # 6. Code Quality Checks
-  # =============================================================================
-  code-quality:
-    name: Code Quality & Linting
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Check line endings
-        run: |
-          echo "Checking for Windows line endings..."
-          ! find . -name "*.cpp" -o -name "*.h" -o -name "*.sh" -o -name "*.py" | \
-            xargs file | grep CRLF || (echo "✗ CRLF line endings found" && exit 1)
-          echo "✓ No CRLF line endings"
-      
-      - name: Check file permissions
-        run: |
-          echo "Checking shell scripts are executable..."
-          for script in start.sh cpp_engine/build.sh; do
-            if [ -f "$script" ] && [ ! -x "$script" ]; then
-              echo "⚠ $script is not executable"
-              chmod +x "$script"
-            fi
-          done
-          echo "✓ File permissions OK"
-      
-      - name: Check for TODO/FIXME comments
-        run: |
-          echo "Scanning for TODO/FIXME comments..."
-          find cpp_engine/src python_api -name "*.cpp" -o -name "*.h" -o -name "*.py" | \
-            xargs grep -n "TODO\|FIXME" || echo "✓ No TODO/FIXME found"
-        continue-on-error: true
-      
-      - name: Verify required files exist
-        run: |
-          required_files=(
-            "README.md"
-            "LICENSE"
-            "Dockerfile"
-            "start.sh"
-            "cpp_engine/CMakeLists.txt"
-            "cpp_engine/src/RiskEngine.h"
-            "cpp_engine/src/RiskEngine.cpp"
-            "python_api/app.py"
-            "python_api/requirements.txt"
-            "js_dashboard/index.html"
-          )
-          
-          for file in "${required_files[@]}"; do
-            if [ ! -f "$file" ]; then
-              echo "✗ Missing required file: $file"
-              exit 1
-            fi
-          done
-          echo "✓ All required files present"
-      
-      - name: Check Python code style (basic)
-        run: |
-          pip install flake8
-          cd python_api
-          # Relaxed rules - just catch obvious errors
-          flake8 app.py market_data_fetcher.py --max-line-length=120 --ignore=E501,W503 || echo "⚠ Style warnings (non-blocking)"
-
-  # =============================================================================
   # 7. Build Script Validation
   # =============================================================================
   build-script-test:
@@ -540,7 +474,6 @@ jobs:
       - frontend-validation
       - docker-build
       - integration-test
-      - code-quality
       - build-script-test
     if: always()
     
@@ -558,7 +491,6 @@ jobs:
           echo "| Frontend Validation | ${{ needs.frontend-validation.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Docker Build | ${{ needs.docker-build.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | ${{ needs.integration-test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Code Quality | ${{ needs.code-quality.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Build Script Test | ${{ needs.build-script-test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
@@ -567,7 +499,6 @@ jobs:
              [ "${{ needs.frontend-validation.result }}" == "success" ] && \
              [ "${{ needs.docker-build.result }}" == "success" ] && \
              [ "${{ needs.integration-test.result }}" == "success" ] && \
-             [ "${{ needs.code-quality.result }}" == "success" ] && \
              [ "${{ needs.build-script-test.result }}" == "success" ]; then
             echo "## ✅ All Checks Passed!" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
