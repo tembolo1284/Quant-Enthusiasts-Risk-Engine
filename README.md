@@ -588,6 +588,431 @@ cmake -DCMAKE_CXX_STANDARD=17 ..
 
 ---
 
+## Live Market Data Integration
+
+### Overview
+
+The Risk Engine now supports automatic fetching of live market data from Yahoo Finance using the YFinance library. This eliminates the need to manually input spot prices, volatilities, and rates for real-world assets.
+
+### Features
+
+- **Automatic Data Fetching**: Retrieve current spot prices, historical volatility, and risk-free rates
+- **Smart Caching**: SQLite-based cache with configurable expiration (default: 24 hours)
+- **Bulk Updates**: Fetch multiple tickers in a single API call
+- **Fallback Support**: Use cached data when API is unavailable
+- **Error Handling**: Graceful degradation when tickers are invalid or data unavailable
+
+---
+
+## API Endpoints
+
+### 1. Update Market Data
+
+Fetch live market data from Yahoo Finance and store in cache.
+
+**Endpoint:** `POST /update_market_data`
+
+**Request Body:**
+```json
+{
+  "tickers": ["AAPL", "GOOGL", "MSFT"],
+  "force_refresh": false
+}
+```
+
+**Parameters:**
+- `tickers` (required): Array of ticker symbols (max 50)
+- `force_refresh` (optional): If `true`, bypass cache and fetch fresh data. Default: `false`
+
+**Response (Success - 200):**
+```json
+{
+  "success": true,
+  "updated": {
+    "AAPL": {
+      "asset_id": "AAPL",
+      "spot": 175.43,
+      "vol": 0.2847,
+      "rate": 0.0445,
+      "dividend": 0.0052,
+      "last_updated": "2025-10-25T14:30:00.123456",
+      "source": "yfinance"
+    },
+    "GOOGL": {
+      "asset_id": "GOOGL",
+      "spot": 140.25,
+      "vol": 0.2634,
+      "rate": 0.0445,
+      "dividend": 0.0,
+      "last_updated": "2025-10-25T14:30:01.234567",
+      "source": "yfinance"
+    }
+  },
+  "failed": [],
+  "summary": {
+    "total_requested": 2,
+    "successful": 2,
+    "failed": 0
+  },
+  "timestamp": "2025-10-25T14:30:01.234567"
+}
+```
+
+**Response (Partial Success - 207 Multi-Status):**
+```json
+{
+  "success": false,
+  "updated": {
+    "AAPL": { ... }
+  },
+  "failed": [
+    {
+      "ticker": "INVALID",
+      "error": "Failed to fetch data for INVALID: No price data available"
+    }
+  ],
+  "summary": {
+    "total_requested": 2,
+    "successful": 1,
+    "failed": 1
+  },
+  "timestamp": "2025-10-25T14:30:01.234567"
+}
+```
+
+**Example Usage:**
+```bash
+curl -X POST http://127.0.0.1:5000/update_market_data \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tickers": ["AAPL", "MSFT", "GOOGL"],
+    "force_refresh": true
+  }'
+```
+
+---
+
+### 2. Get Cached Market Data
+
+Retrieve market data from cache without fetching new data.
+
+**Endpoint:** `GET /get_cached_market_data`
+
+**Query Parameters:**
+- `asset_id` (optional): Specific asset to retrieve. If omitted, returns all cached data.
+
+**Response:**
+```json
+{
+  "AAPL": {
+    "spot": 175.43,
+    "vol": 0.2847,
+    "rate": 0.0445,
+    "dividend": 0.0052,
+    "last_updated": "2025-10-25T14:30:00.123456",
+    "source": "yfinance"
+  },
+  "MSFT": { ... }
+}
+```
+
+**Example Usage:**
+```bash
+# Get all cached data
+curl http://127.0.0.1:5000/get_cached_market_data
+
+# Get specific asset
+curl http://127.0.0.1:5000/get_cached_market_data?asset_id=AAPL
+```
+
+---
+
+### 3. Clear Market Data Cache
+
+Delete all cached market data.
+
+**Endpoint:** `DELETE /clear_market_data_cache`
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Market data cache cleared",
+  "timestamp": "2025-10-25T14:35:00.123456"
+}
+```
+
+**Example Usage:**
+```bash
+curl -X DELETE http://127.0.0.1:5000/clear_market_data_cache
+```
+
+---
+
+## Usage Workflow
+
+### Typical Integration Pattern
+
+1. **Fetch Market Data Once:**
+   ```bash
+   curl -X POST http://127.0.0.1:5000/update_market_data \
+     -H "Content-Type: application/json" \
+     -d '{"tickers": ["AAPL", "GOOGL"]}'
+   ```
+
+2. **Build Portfolio (No Manual Market Data):**
+   ```bash
+   curl -X POST http://127.0.0.1:5000/calculate_risk \
+     -H "Content-Type: application/json" \
+     -d '{
+       "portfolio": [
+         {
+           "type": "call",
+           "strike": 180,
+           "expiry": 1.0,
+           "asset_id": "AAPL",
+           "quantity": 100,
+           "style": "european"
+         }
+       ],
+       "market_data": {}
+     }'
+   ```
+   
+   **Note:** If `market_data` is empty or missing fields, the engine will automatically use cached data.
+
+3. **Refresh Data When Needed:**
+   ```bash
+   curl -X POST http://127.0.0.1:5000/update_market_data \
+     -H "Content-Type: application/json" \
+     -d '{"tickers": ["AAPL"], "force_refresh": true}'
+   ```
+
+---
+
+## Cache Behavior
+
+### Expiration Policy
+- Default cache lifetime: **24 hours**
+- Data older than 24 hours is considered stale
+- Stale data is automatically refreshed on next fetch (unless cached recently)
+
+### Cache Location
+- SQLite database: `market_data_cache.db` (in Python API directory)
+- Persistent across server restarts
+- Can be backed up or migrated
+
+### Cache Priority
+When calculating risk:
+1. Use market data from request body (if provided)
+2. Fall back to cached data (if available and not expired)
+3. Return error if neither is available
+
+---
+
+## Data Sources
+
+### Spot Price
+- Current market price from Yahoo Finance
+- Falls back to last closing price if market is closed
+
+### Volatility
+- Calculated from 252 days (1 year) of historical price data
+- Annualized using standard deviation of log returns
+- Default: 0.25 (25%) if insufficient data
+
+### Risk-Free Rate
+- Attempts to fetch 10-year US Treasury rate (^TNX)
+- Default: 0.045 (4.5%) if unavailable
+
+### Dividend Yield
+- Annual dividend yield from Yahoo Finance
+- Default: 0.0 if not available
+
+---
+
+## Error Handling
+
+### Common Errors
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| `No price data available` | Invalid ticker or delisted stock | Verify ticker symbol |
+| `Failed to fetch data` | Network issue or Yahoo Finance down | Retry or use cached data |
+| `Maximum 50 tickers per request` | Too many tickers in single request | Split into multiple requests |
+| `No cached data for ASSET` | Asset not in cache | Call `/update_market_data` first |
+
+### Validation Rules
+
+- Ticker symbols: 1-10 characters, alphanumeric
+- Maximum: 50 tickers per request
+- Spot price: Must be positive
+- Volatility: Capped between 1% and 200%
+
+---
+
+## Configuration
+
+### Environment Variables
+
+Set these in your environment or `.env` file:
+
+```bash
+# Cache expiration (hours)
+MARKET_DATA_CACHE_HOURS=24
+
+# Default risk-free rate (if fetch fails)
+DEFAULT_RISK_FREE_RATE=0.045
+
+# Cache database path
+MARKET_DATA_CACHE_PATH=./market_data_cache.db
+```
+
+---
+
+## Advanced Usage
+
+### Scheduled Updates
+
+Use cron to automatically refresh market data:
+
+```bash
+# Update every weekday at 9:30 AM
+30 9 * * 1-5 curl -X POST http://localhost:5000/update_market_data \
+  -H "Content-Type: application/json" \
+  -d '{"tickers": ["AAPL", "GOOGL", "MSFT"]}'
+```
+
+### Bulk Portfolio Updates
+
+```python
+import requests
+
+# Update market data for entire portfolio
+tickers = ["AAPL", "GOOGL", "MSFT", "AMZN", "TSLA"]
+response = requests.post(
+    'http://127.0.0.1:5000/update_market_data',
+    json={'tickers': tickers, 'force_refresh': True}
+)
+
+# Calculate risk with fresh data
+portfolio_response = requests.post(
+    'http://127.0.0.1:5000/calculate_risk',
+    json={
+        'portfolio': [...],
+        'market_data': {}  # Will use cached data
+    }
+)
+```
+
+---
+
+## Testing
+
+### Run Test Suite
+
+```bash
+cd python_api
+pytest test_market_data.py -v
+```
+
+### Test Coverage
+
+- ✓ Cache initialization and operations
+- ✓ Data fetching and validation
+- ✓ API endpoint functionality
+- ✓ Error handling and edge cases
+- ✓ Performance benchmarks
+
+### Manual Testing
+
+```bash
+# Test basic fetch
+curl -X POST http://127.0.0.1:5000/update_market_data \
+  -H "Content-Type: application/json" \
+  -d '{"tickers": ["AAPL"]}'
+
+# Verify cache
+curl http://127.0.0.1:5000/get_cached_market_data?asset_id=AAPL
+
+# Test invalid ticker
+curl -X POST http://127.0.0.1:5000/update_market_data \
+  -H "Content-Type: application/json" \
+  -d '{"tickers": ["INVALID_XYZ"]}'
+```
+
+---
+
+## Troubleshooting
+
+### Issue: "Failed to fetch data"
+
+**Cause:** Network connectivity or Yahoo Finance API issues
+
+**Solution:**
+1. Check internet connection
+2. Verify Yahoo Finance is accessible
+3. Use cached data as fallback
+4. Set manual market data in request
+
+### Issue: Cache not updating
+
+**Cause:** Data within expiration window
+
+**Solution:**
+Use `force_refresh: true` in request
+
+### Issue: Volatility seems incorrect
+
+**Cause:** Insufficient historical data or recent IPO
+
+**Solution:**
+- Manually specify volatility in request
+- Use comparable stock's volatility
+- Increase historical data window
+
+---
+
+## Performance
+
+### Benchmarks
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| Single ticker fetch | 1-3s | Network dependent |
+| Cache read | < 1ms | SQLite query |
+| Cache write | < 5ms | SQLite insert |
+| 10 tickers bulk fetch | 5-10s | Parallel requests |
+
+### Optimization Tips
+
+- Fetch market data once per trading day
+- Use bulk updates for multiple tickers
+- Enable caching to reduce API calls
+- Schedule updates during off-peak hours
+
+---
+
+## Limitations
+
+- **Data Quality:** Dependent on Yahoo Finance accuracy
+- **Rate Limiting:** Yahoo Finance may throttle requests
+- **Market Hours:** Real-time data only during trading hours
+- **Geographic Coverage:** Primarily US markets, limited international
+- **Historical Data:** Limited to what Yahoo Finance provides
+
+---
+
+## Future Enhancements
+
+Planned features:
+- [ ] Support for multiple data sources (Alpha Vantage, IEX Cloud)
+- [ ] Real-time streaming updates via WebSocket
+- [ ] Implied volatility surface construction
+- [ ] Options chain data integration
+- [ ] Custom volatility models (GARCH, stochastic vol)
+- [ ] Multi-currency support
+
 ## Contributing
 
 ### How to Contribute

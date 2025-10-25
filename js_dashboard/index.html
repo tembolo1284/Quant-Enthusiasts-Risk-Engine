@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quant Enthusiasts Risk Engine</title>
+    <title>Quant Enthusiasts Risk Engine - Live Data</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -29,15 +29,6 @@
             transform: translateY(-4px);
             box-shadow: 0 8px 25px rgba(6, 182, 212, 0.25);
             border-color: rgba(6, 182, 212, 0.5);
-        }
-
-        .pulse-animation {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         .fade-in {
@@ -81,6 +72,16 @@
             background-color: #ef4444;
             box-shadow: 0 0 10px #ef4444;
         }
+
+        .live-badge {
+            background: linear-gradient(90deg, #10b981, #059669);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
     </style>
 </head>
 <body class="min-h-screen">
@@ -92,7 +93,11 @@
                     Quant Enthusiasts
                 </h1>
             </div>
-            <h2 class="text-xl md:text-2xl font-light text-blue-200">Community Risk Engine v3.0</h2>
+            <h2 class="text-xl md:text-2xl font-light text-blue-200">
+                Community Risk Engine v3.1 
+                <span class="live-badge ml-2">🔴 LIVE DATA</span>
+            </h2>
+            <p class="text-sm text-gray-400 mt-2">Market data automatically fetched from Yahoo Finance</p>
             <div class="mt-4 flex items-center justify-center text-sm">
                 <span id="api-status-indicator" class="status-indicator status-offline"></span>
                 <span id="api-status-text" class="text-gray-400">Checking API status...</span>
@@ -101,15 +106,24 @@
 
         <main class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
+            <!-- Live Market Data Display -->
             <div class="lg:col-span-1 glass-effect p-6 shadow-2xl fade-in">
-                <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
-                    <span class="text-2xl">📊</span>
-                    <span>Market Data</span>
-                </h3>
-                <div id="market-data-container" class="space-y-4">
-                    </div>
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold flex items-center gap-2">
+                        <span class="text-2xl">📊</span>
+                        <span>Live Market Data</span>
+                    </h3>
+                    <button id="refresh-market-data-btn" 
+                            class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded-lg transition">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <div id="market-data-display" class="space-y-3 text-sm">
+                    <p class="text-gray-400 text-center py-8">Add instruments to view market data</p>
+                </div>
             </div>
 
+            <!-- Portfolio Builder -->
             <div class="lg:col-span-2 glass-effect p-6 shadow-2xl fade-in">
                 <h3 class="text-xl font-semibold mb-4 flex items-center gap-2">
                     <span class="text-2xl">💼</span>
@@ -187,7 +201,7 @@
                             </tr>
                         </thead>
                         <tbody id="portfolio-table" class="divide-y divide-gray-700/50">
-                            </tbody>
+                        </tbody>
                     </table>
                     <div id="empty-portfolio" class="text-center py-8 text-gray-500">
                         No instruments in portfolio. Add one to get started.
@@ -195,6 +209,7 @@
                 </div>
             </div>
 
+            <!-- Risk Analysis -->
             <div class="lg:col-span-3 glass-effect p-6 shadow-2xl fade-in">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
                     <h3 class="text-xl font-semibold flex items-center gap-2">
@@ -208,11 +223,18 @@
                 </div>
                 
                 <div id="results-container" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 hidden">
-                    </div>
+                </div>
+                
+                <div id="auto-fetch-info" class="hidden mt-4 p-4 bg-green-900/20 border border-green-500/50 rounded-lg">
+                    <p class="text-sm text-green-300">
+                        <span class="font-semibold">✓ Auto-fetched market data for:</span>
+                        <span id="auto-fetched-assets" class="ml-2"></span>
+                    </p>
+                </div>
                 
                 <div id="spinner" class="hidden flex flex-col justify-center items-center py-12">
                     <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-cyan-500 mb-4"></div>
-                    <p class="text-gray-400 animate-pulse">Calculating risk metrics...</p>
+                    <p class="text-gray-400 animate-pulse">Fetching live data and calculating risk...</p>
                 </div>
                 
                 <div id="error-message" class="hidden p-4 bg-red-900/30 border border-red-500/50 text-red-300 rounded-lg">
@@ -220,32 +242,29 @@
                 
                 <div id="initial-state" class="text-center py-12 text-gray-500">
                     Add instruments to your portfolio and calculate risk metrics.
+                    <br><small class="text-xs">Market data will be fetched automatically</small>
                 </div>
             </div>
         </main>
 
         <footer class="text-center mt-8 text-gray-400 opacity-60 text-sm">
-            <p>Powered by C++ Quantitative Risk Engine with Python Flask API</p>
+            <p>Powered by C++ Risk Engine + Python Flask + Yahoo Finance Live Data</p>
         </footer>
     </div>
 
     <script>
         const CONFIG = {
             API_BASE_URL: 'http://127.0.0.1:5000',
-            API_HEALTH_CHECK_INTERVAL: 30000,
-            DEFAULT_MARKET_DATA: {
-                spot: 100,
-                rate: 0.05,
-                vol: 0.25,
-                dividend: 0.0
-            }
+            API_HEALTH_CHECK_INTERVAL: 30000
         };
+
         const STATE = {
             portfolio: [],
-            marketData: {},
+            marketDataCache: {},
             apiOnline: false,
             calculating: false
         };
+
         const ELEMENTS = {
             instrumentForm: document.getElementById('instrument-form'),
             assetIdInput: document.getElementById('asset-id'),
@@ -257,31 +276,40 @@
             portfolioTable: document.getElementById('portfolio-table'),
             emptyPortfolio: document.getElementById('empty-portfolio'),
             portfolioCount: document.getElementById('portfolio-count'),
-            marketDataContainer: document.getElementById('market-data-container'),
+            marketDataDisplay: document.getElementById('market-data-display'),
+            refreshMarketDataBtn: document.getElementById('refresh-market-data-btn'),
             calculateBtn: document.getElementById('calculate-risk-btn'),
             resultsContainer: document.getElementById('results-container'),
+            autoFetchInfo: document.getElementById('auto-fetch-info'),
+            autoFetchedAssets: document.getElementById('auto-fetched-assets'),
             spinner: document.getElementById('spinner'),
             errorMessage: document.getElementById('error-message'),
             initialState: document.getElementById('initial-state'),
             apiStatusIndicator: document.getElementById('api-status-indicator'),
             apiStatusText: document.getElementById('api-status-text')
         };
+
         const showError = (message) => {
             ELEMENTS.errorMessage.textContent = message;
             ELEMENTS.errorMessage.classList.remove('hidden');
             ELEMENTS.resultsContainer.classList.add('hidden');
+            ELEMENTS.autoFetchInfo.classList.add('hidden');
             ELEMENTS.initialState.classList.add('hidden');
             setTimeout(() => ELEMENTS.errorMessage.classList.add('hidden'), 10000);
         };
+
         const showSpinner = () => {
             ELEMENTS.spinner.classList.remove('hidden');
             ELEMENTS.resultsContainer.classList.add('hidden');
             ELEMENTS.errorMessage.classList.add('hidden');
+            ELEMENTS.autoFetchInfo.classList.add('hidden');
             ELEMENTS.initialState.classList.add('hidden');
         };
+
         const hideSpinner = () => {
             ELEMENTS.spinner.classList.add('hidden');
         };
+
         const checkApiHealth = async () => {
             try {
                 const response = await fetch(`${CONFIG.API_BASE_URL}/health`, {
@@ -289,9 +317,10 @@
                     headers: { 'Content-Type': 'application/json' }
                 });
                 if (response.ok) {
+                    const data = await response.json();
                     STATE.apiOnline = true;
                     ELEMENTS.apiStatusIndicator.className = 'status-indicator status-online';
-                    ELEMENTS.apiStatusText.textContent = 'API Connected';
+                    ELEMENTS.apiStatusText.textContent = `API Connected (${data.cache_info.cached_assets} assets cached)`;
                     ELEMENTS.calculateBtn.disabled = false;
                 } else {
                     throw new Error('API health check failed');
@@ -303,96 +332,91 @@
                 ELEMENTS.calculateBtn.disabled = true;
             }
         };
-        const validateInstrument = (instrument) => {
-            const errors = [];
-            if (!instrument.asset_id || instrument.asset_id.trim() === '') {
-                errors.push('Asset ID is required');
+
+        const fetchMarketData = async (tickers, forceRefresh = false) => {
+            try {
+                const response = await fetch(`${CONFIG.API_BASE_URL}/update_market_data`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tickers: tickers,
+                        force_refresh: forceRefresh
+                    })
+                });
+
+                if (response.ok || response.status === 207) {
+                    const data = await response.json();
+                    
+                    // Update cache
+                    for (const [ticker, marketData] of Object.entries(data.updated)) {
+                        STATE.marketDataCache[ticker] = marketData;
+                    }
+                    
+                    return data;
+                }
+            } catch (error) {
+                console.error('Error fetching market data:', error);
             }
-            if (instrument.strike <= 0) {
-                errors.push('Strike price must be positive');
-            }
-            if (instrument.expiry <= 0) {
-                errors.push('Expiry must be positive');
-            }
-            if (instrument.quantity === 0) {
-                errors.push('Quantity cannot be zero');
-            }
-            return errors;
+            return null;
         };
-        
-        const updateMarketDataFields = () => {
-            const neededAssets = new Set(STATE.portfolio.map(p => p.asset_id));
-            if (neededAssets.size === 0) {
-                neededAssets.add(ELEMENTS.assetIdInput.value.toUpperCase() || "AAPL");
+
+        const updateMarketDataDisplay = () => {
+            const assets = new Set(STATE.portfolio.map(p => p.asset_id));
+            
+            if (assets.size === 0) {
+                ELEMENTS.marketDataDisplay.innerHTML = '<p class="text-gray-400 text-center py-8">Add instruments to view market data</p>';
+                return;
             }
-            ELEMENTS.marketDataContainer.innerHTML = '';
-            const currentMarketData = { ...STATE.marketData };
-            STATE.marketData = {};
-            neededAssets.forEach(assetId => {
-                const existingData = currentMarketData[assetId] || { ...CONFIG.DEFAULT_MARKET_DATA };
-                STATE.marketData[assetId] = existingData;
-                const wrapper = document.createElement('div');
-                wrapper.className = 'p-4 bg-gray-800/40 rounded-xl border border-gray-700/60 hover:border-cyan-500/50 transition fade-in';
-                wrapper.innerHTML = `
-                    <h4 class="text-lg font-bold text-cyan-400 mb-3 flex items-center gap-2">
-                        <span>📌</span>
-                        <span>${assetId}</span>
-                    </h4>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="text-xs text-gray-400 block mb-1">Spot Price</label>
-                            <input type="number"
-                                    data-asset="${assetId}"
-                                    data-field="spot"
-                                    value="${existingData.spot}"
-                                    step="0.01"
-                                   min="0.01"
-                                   class="w-full bg-gray-700/60 text-white p-2 rounded-lg text-sm border border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+
+            ELEMENTS.marketDataDisplay.innerHTML = '';
+            
+            assets.forEach(asset => {
+                const cached = STATE.marketDataCache[asset];
+                const card = document.createElement('div');
+                card.className = 'p-3 bg-gray-800/40 rounded-lg border border-gray-700/60';
+                
+                if (cached) {
+                    const ageMinutes = Math.floor((new Date() - new Date(cached.last_updated)) / 60000);
+                    const ageText = ageMinutes < 60 ? `${ageMinutes}m ago` : `${Math.floor(ageMinutes/60)}h ago`;
+                    
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="font-bold text-cyan-400">${asset}</h4>
+                            <span class="text-xs text-gray-500">${ageText}</span>
                         </div>
-                        <div>
-                            <label class="text-xs text-gray-400 block mb-1">Rate (r)</label>
-                            <input type="number"
-                                    data-asset="${assetId}"
-                                    data-field="rate"
-                                    value="${existingData.rate}"
-                                    step="0.001"
-                                   class="w-full bg-gray-700/60 text-white p-2 rounded-lg text-sm border border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div><span class="text-gray-400">Spot:</span> <span class="text-white">${cached.spot.toFixed(2)}</span></div>
+                            <div><span class="text-gray-400">Vol:</span> <span class="text-white">${(cached.vol * 100).toFixed(1)}%</span></div>
+                            <div><span class="text-gray-400">Rate:</span> <span class="text-white">${(cached.rate * 100).toFixed(2)}%</span></div>
+                            <div><span class="text-gray-400">Div:</span> <span class="text-white">${(cached.dividend * 100).toFixed(2)}%</span></div>
                         </div>
-                        <div>
-                            <label class="text-xs text-gray-400 block mb-1">Volatility (σ)</label>
-                            <input type="number"
-                                    data-asset="${assetId}"
-                                    data-field="vol"
-                                    value="${existingData.vol}"
-                                    step="0.01"
-                                   min="0"
-                                   class="w-full bg-gray-700/60 text-white p-2 rounded-lg text-sm border border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
-                        </div>
-                        <div>
-                            <label class="text-xs text-gray-400 block mb-1">Dividend</label>
-                            <input type="number"
-                                    data-asset="${assetId}"
-                                    data-field="dividend"
-                                    value="${existingData.dividend || 0}"
-                                    step="0.001"
-                                   min="0"
-                                   class="w-full bg-gray-700/60 text-white p-2 rounded-lg text-sm border border-gray-600 focus:ring-2 focus:ring-cyan-500 focus:border-transparent">
-                        </div>
-                    </div>
-                `;
-                ELEMENTS.marketDataContainer.appendChild(wrapper);
+                    `;
+                } else {
+                    card.innerHTML = `
+                        <h4 class="font-bold text-cyan-400 mb-2">${asset}</h4>
+                        <p class="text-xs text-yellow-400">⚠ Will fetch on calculate</p>
+                    `;
+                }
+                
+                ELEMENTS.marketDataDisplay.appendChild(card);
             });
         };
 
-        ELEMENTS.marketDataContainer.addEventListener('input', (e) => {
-            if (e.target.matches('input[type="number"]')) {
-                const { asset, field } = e.target.dataset;
-                const value = parseFloat(e.target.value);
-                if (!isNaN(value)) {
-                    STATE.marketData[asset][field] = value;
-                }
-            }
+        ELEMENTS.refreshMarketDataBtn.addEventListener('click', async () => {
+            const assets = [...new Set(STATE.portfolio.map(p => p.asset_id))];
+            if (assets.length === 0) return;
+            
+            ELEMENTS.refreshMarketDataBtn.disabled = true;
+            ELEMENTS.refreshMarketDataBtn.textContent = '⏳ Fetching...';
+            
+            await fetchMarketData(assets, true);
+            updateMarketDataDisplay();
+            await checkApiHealth();
+            
+            ELEMENTS.refreshMarketDataBtn.disabled = false;
+            ELEMENTS.refreshMarketDataBtn.textContent = '🔄 Refresh';
         });
+
         const updatePortfolioCount = () => {
             const count = STATE.portfolio.length;
             ELEMENTS.portfolioCount.textContent = `${count} instrument${count !== 1 ? 's' : ''}`;
@@ -404,10 +428,12 @@
                 ELEMENTS.emptyPortfolio.classList.remove('hidden');
                 ELEMENTS.calculateBtn.disabled = true;
                 updatePortfolioCount();
+                updateMarketDataDisplay();
                 return;
             }
             ELEMENTS.emptyPortfolio.classList.add('hidden');
             ELEMENTS.calculateBtn.disabled = !STATE.apiOnline;
+            
             STATE.portfolio.forEach((instrument, index) => {
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-gray-700/50 transition fade-in';
@@ -426,30 +452,32 @@
                         </span>
                     </td>
                     <td class="py-3 px-4 text-right font-mono ${qtyColor}">${qtySign}${instrument.quantity}</td>
-                    <td class="py-3 px-4 text-right font-mono">$${instrument.strike.toFixed(2)}</td>
+                    <td class="py-3 px-4 text-right font-mono">${instrument.strike.toFixed(2)}</td>
                     <td class="py-3 px-4 text-right font-mono">${instrument.expiry.toFixed(2)}y</td>
                     <td class="py-3 px-4 text-center">
                         <button onclick="removeInstrument(${index})"
-                                 class="text-gray-400 hover:text-red-400 hover:bg-red-500/20 rounded-full w-7 h-7 flex items-center justify-center font-bold text-lg"
-                                 title="Remove instrument">
+                                class="text-gray-400 hover:text-red-400 hover:bg-red-500/20 rounded-full w-7 h-7 flex items-center justify-center font-bold text-lg mx-auto"
+                                title="Remove instrument">
                             ×
                         </button>
                     </td>
                 `;
                 ELEMENTS.portfolioTable.appendChild(row);
             });
-            updateMarketDataFields();
             updatePortfolioCount();
+            updateMarketDataDisplay();
         };
-        
+
         window.removeInstrument = (index) => {
             if (confirm(`Remove ${STATE.portfolio[index].asset_id} ${STATE.portfolio[index].type} from portfolio?`)) {
                 STATE.portfolio.splice(index, 1);
                 renderPortfolio();
                 ELEMENTS.resultsContainer.classList.add('hidden');
+                ELEMENTS.autoFetchInfo.classList.add('hidden');
                 ELEMENTS.initialState.classList.remove('hidden');
             }
         };
+
         ELEMENTS.instrumentForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const newInstrument = {
@@ -460,21 +488,17 @@
                 expiry: parseFloat(ELEMENTS.expiryInput.value),
                 quantity: parseInt(ELEMENTS.quantityInput.value)
             };
-            const errors = validateInstrument(newInstrument);
-            if (errors.length > 0) {
-                showError(`Validation error: ${errors.join(', ')}`);
-                return;
-            }
+
             STATE.portfolio.push(newInstrument);
             renderPortfolio();
+            
             ELEMENTS.instrumentForm.reset();
             ELEMENTS.assetIdInput.value = newInstrument.asset_id;
             ELEMENTS.strikeInput.value = "100";
             ELEMENTS.expiryInput.value = "1.0";
             ELEMENTS.quantityInput.value = "100";
-            ELEMENTS.styleSelect.value = "european";
-            ELEMENTS.typeSelect.value = "call";
         });
+
         const formatValue = (value, decimals = 2) => {
             if (value === null || value === undefined || isNaN(value)) return 'N/A';
             return value.toLocaleString('en-US', {
@@ -482,50 +506,78 @@
                 maximumFractionDigits: decimals
             });
         };
+
         const getMetricColor = (label, value) => {
             if (label.includes('VaR')) return 'text-red-400';
             if (label === 'Total PV') return value >= 0 ? 'text-green-400' : 'text-red-400';
             if (label === 'Delta') return Math.abs(value) > 10 ? 'text-yellow-400' : 'text-cyan-400';
             return 'text-cyan-400';
         };
+
         ELEMENTS.calculateBtn.addEventListener('click', async () => {
             if (STATE.calculating) return;
             if (STATE.portfolio.length === 0) {
                 showError('Portfolio is empty. Add instruments before calculating risk.');
                 return;
             }
+
             STATE.calculating = true;
             ELEMENTS.calculateBtn.disabled = true;
             showSpinner();
+
+            // Send empty market_data object - API will auto-fetch
             const payload = {
                 portfolio: STATE.portfolio,
-                market_data: STATE.marketData,
+                market_data: {},  // Empty - let API auto-fetch
                 var_parameters: {
                     simulations: 100000,
                     confidence: 0.95,
                     time_horizon: 1.0
                 }
             };
+
             try {
                 const response = await fetch(`${CONFIG.API_BASE_URL}/calculate_risk`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+
                 if (!response.ok) {
                     const errorData = await response.json();
                     throw new Error(errorData.error || `HTTP ${response.status}: Calculation failed`);
                 }
+
                 const results = await response.json();
-                const metrics = [
-                    { label: 'Total PV', value: results.total_pv, prefix: '$' },
-                    { label: 'Delta', value: results.total_delta },
-                    { label: 'Gamma', value: results.total_gamma },
-                    { label: 'Vega', value: results.total_vega },
-                    { label: 'Theta', value: results.total_theta },
-                    { label: '95% VaR (1d)', value: results.value_at_risk_95, prefix: '$' }
-                ];
-                
+
+                // Update cache with auto-fetched data
+                if (results.market_data_info && results.market_data_info.market_data_used) {
+                    for (const [ticker, data] of Object.entries(results.market_data_info.market_data_used)) {
+                        STATE.marketDataCache[ticker] = {
+                            ...data,
+                            last_updated: new Date().toISOString()
+                        };
+                    }
+                    updateMarketDataDisplay();
+                }
+
+                // Show auto-fetched assets info
+                if (results.market_data_info && results.market_data_info.auto_fetched_assets.length > 0) {
+                    ELEMENTS.autoFetchedAssets.textContent = results.market_data_info.auto_fetched_assets.join(', ');
+                    ELEMENTS.autoFetchInfo.classList.remove('hidden');
+                } else {
+                    ELEMENTS.autoFetchInfo.classList.add('hidden');
+                }
+
+const metrics = [
+    { label: 'Total PV', value: results.total_pv, prefix: '$' },
+    { label: 'Delta', value: results.total_delta },
+    { label: 'Gamma', value: results.total_gamma },
+    { label: 'Vega', value: results.total_vega },
+    { label: 'Theta', value: results.total_theta },
+    { label: '95% VaR (1d)', value: results.value_at_risk_95, prefix: '$' }
+];
+
                 ELEMENTS.resultsContainer.innerHTML = metrics.map(({ label, value, prefix = '' }) => `
                     <div class="metric-card bg-gray-800/50 p-5 rounded-xl border border-gray-700/60 hover:border-cyan-500/50 transition">
                         <p class="text-xs text-gray-400 mb-2 uppercase tracking-wide">${label}</p>
@@ -536,18 +588,23 @@
                 ELEMENTS.resultsContainer.classList.remove('hidden');
                 ELEMENTS.initialState.classList.add('hidden');
                 ELEMENTS.errorMessage.classList.add('hidden');
+
+                // Update health check to show updated cache
+                await checkApiHealth();
+
             } catch (error) {
-                showError(`Error: ${error.message}. Ensure the Flask API is running on ${CONFIG.API_BASE_URL}`);
+                showError(`Error: ${error.message}`);
             } finally {
                 hideSpinner();
                 STATE.calculating = false;
                 ELEMENTS.calculateBtn.disabled = !STATE.apiOnline || STATE.portfolio.length === 0;
             }
         });
+
+        // Initialize
         checkApiHealth();
         setInterval(checkApiHealth, CONFIG.API_HEALTH_CHECK_INTERVAL);
         renderPortfolio();
     </script>
 </body>
 </html>
-```
