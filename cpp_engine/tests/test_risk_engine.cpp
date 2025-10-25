@@ -31,6 +31,9 @@ void test_empty_portfolio(TestSuite& suite) {
         suite.assert_equal(0.0, result.total_vega, 1e-10);
         suite.assert_equal(0.0, result.total_theta, 1e-10);
         suite.assert_equal(0.0, result.value_at_risk_95, 1e-10);
+        suite.assert_equal(0.0, result.value_at_risk_99, 1e-10);
+        suite.assert_equal(0.0, result.expected_shortfall_95, 1e-10);
+        suite.assert_equal(0.0, result.expected_shortfall_99, 1e-10);
     });
 }
 
@@ -46,6 +49,7 @@ void test_single_call_option(TestSuite& suite) {
         market_data_map["AAPL"] = createMarketData("AAPL", 100.0, 0.05, 0.2);
         
         RiskEngine engine;
+        engine.setRandomSeed(42);  // For reproducibility
         PortfolioRiskResult result = engine.calculatePortfolioRisk(portfolio, market_data_map);
         
         // Expected values from BlackScholes
@@ -56,7 +60,18 @@ void test_single_call_option(TestSuite& suite) {
         
         // VaR should be positive (loss is positive)
         if (result.value_at_risk_95 <= 0.0) {
-            throw std::runtime_error("VaR should be positive for long position");
+            throw std::runtime_error("VaR 95% should be positive for long position");
+        }
+        if (result.value_at_risk_99 <= 0.0) {
+            throw std::runtime_error("VaR 99% should be positive for long position");
+        }
+        
+        // ES should be positive
+        if (result.expected_shortfall_95 <= 0.0) {
+            throw std::runtime_error("ES 95% should be positive for long position");
+        }
+        if (result.expected_shortfall_99 <= 0.0) {
+            throw std::runtime_error("ES 99% should be positive for long position");
         }
     });
 }
@@ -248,18 +263,31 @@ void test_var_properties(TestSuite& suite) {
         market_data_map["AAPL"] = createMarketData("AAPL", 100.0, 0.05, 0.2);
         
         RiskEngine engine;
+        engine.setRandomSeed(42);  // For reproducibility
+        
         PortfolioRiskResult small_result = engine.calculatePortfolioRisk(small_portfolio, market_data_map);
+        
+        engine.setRandomSeed(42);  // Reset seed
         PortfolioRiskResult large_result = engine.calculatePortfolioRisk(large_portfolio, market_data_map);
         
-        // Larger position should have larger VaR
+        // Larger position should have larger VaR (both 95% and 99%)
         if (large_result.value_at_risk_95 <= small_result.value_at_risk_95) {
-            throw std::runtime_error("VaR should increase with position size");
+            throw std::runtime_error("VaR 95% should increase with position size");
+        }
+        
+        if (large_result.value_at_risk_99 <= small_result.value_at_risk_99) {
+            throw std::runtime_error("VaR 99% should increase with position size");
         }
         
         // VaR should scale roughly linearly (within Monte Carlo noise)
-        double var_ratio = large_result.value_at_risk_95 / small_result.value_at_risk_95;
-        if (var_ratio < 8.0 || var_ratio > 12.0) {
-            throw std::runtime_error("VaR scaling seems off: ratio = " + std::to_string(var_ratio));
+        double var_95_ratio = large_result.value_at_risk_95 / small_result.value_at_risk_95;
+        if (var_95_ratio < 8.0 || var_95_ratio > 12.0) {
+            throw std::runtime_error("VaR 95% scaling seems off: ratio = " + std::to_string(var_95_ratio));
+        }
+        
+        double var_99_ratio = large_result.value_at_risk_99 / small_result.value_at_risk_99;
+        if (var_99_ratio < 8.0 || var_99_ratio > 12.0) {
+            throw std::runtime_error("VaR 99% scaling seems off: ratio = " + std::to_string(var_99_ratio));
         }
     });
     
@@ -277,7 +305,144 @@ void test_var_properties(TestSuite& suite) {
         PortfolioRiskResult result = engine.calculatePortfolioRisk(portfolio, market_data_map);
         
         if (result.value_at_risk_95 < 0.0) {
-            throw std::runtime_error("VaR should be non-negative");
+            throw std::runtime_error("VaR 95% should be non-negative");
+        }
+        
+        if (result.value_at_risk_99 < 0.0) {
+            throw std::runtime_error("VaR 99% should be non-negative");
+        }
+    });
+}
+
+void test_var_99_vs_95(TestSuite& suite) {
+    suite.run_test("VaR 99% should be greater than VaR 95%", [&]() {
+        Portfolio portfolio;
+        portfolio.addInstrument(
+            std::make_unique<EuropeanOption>(OptionType::Call, 100.0, 1.0, "AAPL"),
+            5
+        );
+        
+        std::map<std::string, MarketData> market_data_map;
+        market_data_map["AAPL"] = createMarketData("AAPL", 100.0, 0.05, 0.2);
+        
+        RiskEngine engine;
+        engine.setRandomSeed(42);
+        PortfolioRiskResult result = engine.calculatePortfolioRisk(portfolio, market_data_map);
+        
+        // 99% VaR should be greater than 95% VaR (more extreme loss)
+        if (result.value_at_risk_99 <= result.value_at_risk_95) {
+            throw std::runtime_error(
+                "VaR 99% (" + std::to_string(result.value_at_risk_99) + 
+                ") should be greater than VaR 95% (" + std::to_string(result.value_at_risk_95) + ")"
+            );
+        }
+        
+        // Typically VaR 99% is 1.2-1.5x VaR 95% for normal-like distributions
+        double ratio = result.value_at_risk_99 / result.value_at_risk_95;
+        if (ratio < 1.1 || ratio > 2.0) {
+            throw std::runtime_error(
+                "VaR 99%/95% ratio seems unusual: " + std::to_string(ratio)
+            );
+        }
+    });
+}
+
+void test_expected_shortfall_properties(TestSuite& suite) {
+    suite.run_test("Expected Shortfall is greater than VaR", [&]() {
+        Portfolio portfolio;
+        portfolio.addInstrument(
+            std::make_unique<EuropeanOption>(OptionType::Call, 100.0, 1.0, "AAPL"),
+            5
+        );
+        
+        std::map<std::string, MarketData> market_data_map;
+        market_data_map["AAPL"] = createMarketData("AAPL", 100.0, 0.05, 0.2);
+        
+        RiskEngine engine;
+        engine.setRandomSeed(42);
+        PortfolioRiskResult result = engine.calculatePortfolioRisk(portfolio, market_data_map);
+        
+        // ES should be >= VaR at the same confidence level
+        if (result.expected_shortfall_95 < result.value_at_risk_95) {
+            throw std::runtime_error(
+                "ES 95% (" + std::to_string(result.expected_shortfall_95) + 
+                ") should be >= VaR 95% (" + std::to_string(result.value_at_risk_95) + ")"
+            );
+        }
+        
+        if (result.expected_shortfall_99 < result.value_at_risk_99) {
+            throw std::runtime_error(
+                "ES 99% (" + std::to_string(result.expected_shortfall_99) + 
+                ") should be >= VaR 99% (" + std::to_string(result.value_at_risk_99) + ")"
+            );
+        }
+        
+        // ES 99% should be greater than ES 95%
+        if (result.expected_shortfall_99 <= result.expected_shortfall_95) {
+            throw std::runtime_error(
+                "ES 99% (" + std::to_string(result.expected_shortfall_99) + 
+                ") should be greater than ES 95% (" + std::to_string(result.expected_shortfall_95) + ")"
+            );
+        }
+    });
+    
+    suite.run_test("Expected Shortfall is non-negative", [&]() {
+        Portfolio portfolio;
+        portfolio.addInstrument(
+            std::make_unique<EuropeanOption>(OptionType::Put, 100.0, 1.0, "AAPL"),
+            3
+        );
+        
+        std::map<std::string, MarketData> market_data_map;
+        market_data_map["AAPL"] = createMarketData("AAPL", 100.0, 0.05, 0.2);
+        
+        RiskEngine engine;
+        PortfolioRiskResult result = engine.calculatePortfolioRisk(portfolio, market_data_map);
+        
+        if (result.expected_shortfall_95 < 0.0) {
+            throw std::runtime_error("ES 95% should be non-negative");
+        }
+        
+        if (result.expected_shortfall_99 < 0.0) {
+            throw std::runtime_error("ES 99% should be non-negative");
+        }
+    });
+}
+
+void test_expected_shortfall_scaling(TestSuite& suite) {
+    suite.run_test("Expected Shortfall scales with position size", [&]() {
+        Portfolio small_portfolio;
+        small_portfolio.addInstrument(
+            std::make_unique<EuropeanOption>(OptionType::Call, 100.0, 1.0, "AAPL"),
+            2
+        );
+        
+        Portfolio large_portfolio;
+        large_portfolio.addInstrument(
+            std::make_unique<EuropeanOption>(OptionType::Call, 100.0, 1.0, "AAPL"),
+            10
+        );
+        
+        std::map<std::string, MarketData> market_data_map;
+        market_data_map["AAPL"] = createMarketData("AAPL", 100.0, 0.05, 0.2);
+        
+        RiskEngine engine;
+        engine.setRandomSeed(42);
+        
+        PortfolioRiskResult small_result = engine.calculatePortfolioRisk(small_portfolio, market_data_map);
+        
+        engine.setRandomSeed(42);
+        PortfolioRiskResult large_result = engine.calculatePortfolioRisk(large_portfolio, market_data_map);
+        
+        // ES should scale roughly linearly with position size
+        double es_95_ratio = large_result.expected_shortfall_95 / small_result.expected_shortfall_95;
+        if (es_95_ratio < 4.0 || es_95_ratio > 6.0) {
+            throw std::runtime_error("ES 95% scaling seems off: ratio = " + std::to_string(es_95_ratio));
+        }
+        
+        double es_99_ratio = large_result.expected_shortfall_99 / small_result.expected_shortfall_99;
+        if (es_99_ratio < 4.0 || es_99_ratio > 6.0) {
+            throw std::runtime_error("ES 99% scaling seems off: ratio = " + std::to_string(es_99_ratio));
         }
     });
 }
@@ -319,6 +484,9 @@ int main() {
     test_delta_neutral_portfolio(suite);
     test_multi_asset_portfolio(suite);
     test_var_properties(suite);
+    test_var_99_vs_95(suite);
+    test_expected_shortfall_properties(suite);
+    test_expected_shortfall_scaling(suite);
     test_theta_time_decay(suite);
     
     suite.print_summary();
