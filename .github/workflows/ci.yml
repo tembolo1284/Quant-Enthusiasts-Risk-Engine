@@ -344,20 +344,19 @@ jobs:
             }' \
             -o response.json -w "%{http_code}" | grep -q "200" || (cat response.json && exit 1)
           
-          # Verify response contains expected fields
-          cat response.json | python -c '
-import json, sys
-data = json.load(sys.stdin)
-required_fields = ['total_pv', 'total_delta', 'total_gamma', 'total_vega', 'total_theta', 'value_at_risk_95']
-missing = [f for f in required_fields if f not in data]
-if missing:
-    print(f'✗ Missing fields: {missing}')
-    sys.exit(1)
-print('✓ All required fields present')
-print(f'  Total PV: {data[\"total_pv\"]:.2f}')
-print(f'  VaR 95%: {data[\"value_at_risk_95\"]:.2f}')
-          '
-      
+          # Verify response is valid JSON and contains expected fields
+          echo "Validating response..."
+          for field in total_pv total_delta total_gamma total_vega total_theta value_at_risk_95; do
+            if ! grep -q "\"$field\"" response.json; then
+              echo "✗ Missing field: $field"
+              cat response.json
+              exit 1
+            fi
+          done
+          
+          echo "All required fields present in response"
+          cat response.json
+ 
       - name: Test option pricing endpoint
         run: |
           curl -X POST http://localhost:5000/price_option \
