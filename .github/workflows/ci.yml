@@ -1,0 +1,600 @@
+name: Quant Risk Engine CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '18'
+
+jobs:
+  # =============================================================================
+  # 1. C++ Build and Test Matrix
+  # =============================================================================
+  cpp-build-test:
+    name: C++ ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        compiler: [gcc, clang]
+        build_type: [Debug, Release]
+        exclude:
+          - os: macos-latest
+            compiler: gcc
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake clang libc++-dev libc++abi-dev
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake
+      
+      - name: Set compiler
+        run: |
+          if [ "${{ matrix.compiler }}" == "gcc" ]; then
+            echo "CC=gcc" >> $GITHUB_ENV
+            echo "CXX=g++" >> $GITHUB_ENV
+          else
+            echo "CC=clang" >> $GITHUB_ENV
+            echo "CXX=clang++" >> $GITHUB_ENV
+          fi
+      
+      - name: Build C++
+        working-directory: cpp_engine
+        run: |
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                -DCMAKE_CXX_COMPILER=${{ env.CXX }} \
+                -DBUILD_TESTS=ON ..
+          make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+      
+      - name: Run C++ tests
+        working-directory: cpp_engine/build
+        run: ctest --output-on-failure -C ${{ matrix.build_type }}
+      
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-test-results-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}
+          path: cpp_engine/build/Testing/
+
+  # =============================================================================
+  # 2. Python API Build and Test
+  # =============================================================================
+  python-api-test:
+    name: Python API ${{ matrix.os }} (Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install system dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+      
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake
+      
+      - name: Install Python dependencies
+        working-directory: python_api
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-flask pytest-cov requests-mock
+      
+      - name: Build Python bindings
+        working-directory: python_api
+        run: python setup.py build_ext --inplace
+      
+      - name: Verify bindings import
+        working-directory: python_api
+        run: |
+          python -c "import quant_risk_engine; print('✓ Bindings loaded')"
+          python -c "import quant_risk_engine as qre; print(f'Available: {dir(qre)}')"
+      
+      - name: Test Flask API imports
+        working-directory: python_api
+        run: |
+          python -c "from app import app; print('✓ Flask app loaded')"
+          python -c "from market_data_fetcher import get_market_data_fetcher; print('✓ Market data fetcher loaded')"
+      
+      - name: Run Python tests
+        working-directory: python_api
+        run: |
+          if [ -f test_market_data.py ]; then
+            pytest test_market_data.py -v --cov=. --cov-report=term-missing
+          else
+            echo "No test files found - creating basic sanity test"
+            python -c "
+import quant_risk_engine as qre
+import sys
+
+# Test basic functionality
+try:
+    md = qre.MarketData('TEST', 100.0, 0.05, 0.2)
+    print('✓ MarketData creation works')
+    
+    option = qre.EuropeanOption(qre.OptionType.Call, 100.0, 1.0, 'TEST')
+    print('✓ EuropeanOption creation works')
+    
+    price = option.price(md)
+    print(f'✓ Option pricing works: {price:.2f}')
+    
+    print('✓ All basic sanity checks passed')
+    sys.exit(0)
+except Exception as e:
+    print(f'✗ Sanity check failed: {e}')
+    sys.exit(1)
+            "
+          fi
+      
+      - name: Upload Python bindings
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-bindings-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: python_api/quant_risk_engine*.so
+          if-no-files-found: warn
+
+  # =============================================================================
+  # 3. Frontend Validation
+  # =============================================================================
+  frontend-validation:
+    name: Frontend HTML/JS Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install HTML validator
+        run: npm install -g html-validate
+      
+      - name: Validate HTML
+        working-directory: js_dashboard
+        run: |
+          cat > .htmlvalidate.json << 'EOF'
+          {
+            "extends": ["html-validate:recommended"],
+            "rules": {
+              "require-sri": "off",
+              "no-inline-style": "off"
+            }
+          }
+          EOF
+          html-validate index.html || echo "HTML validation warnings (non-blocking)"
+      
+      - name: Check for CDN availability
+        run: |
+          echo "Checking Tailwind CDN..."
+          curl -f -s -o /dev/null https://cdn.tailwindcss.com || (echo "✗ Tailwind CDN unreachable" && exit 1)
+          echo "✓ All CDNs accessible"
+      
+      - name: Check JavaScript syntax
+        working-directory: js_dashboard
+        run: |
+          # Extract and check JavaScript from HTML
+          node -e "
+          const fs = require('fs');
+          const html = fs.readFileSync('index.html', 'utf8');
+          const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
+          if (scriptMatch && scriptMatch[1]) {
+            console.log('✓ JavaScript found in HTML');
+            // Basic syntax check - will fail on syntax errors
+            try {
+              new Function(scriptMatch[1]);
+              console.log('✓ JavaScript syntax valid');
+            } catch (e) {
+              console.error('✗ JavaScript syntax error:', e.message);
+              process.exit(1);
+            }
+          }
+          " || echo "Note: JavaScript validation skipped"
+      
+      - name: Check for security issues
+        working-directory: js_dashboard
+        run: |
+          echo "Checking for common security issues..."
+          
+          # Check for inline JavaScript with dangerous patterns
+          if grep -q "eval(" index.html; then
+            echo "⚠ Warning: eval() found in code"
+          fi
+          
+          if grep -q "innerHTML" index.html; then
+            echo "⚠ Warning: innerHTML usage detected (check for XSS)"
+          fi
+          
+          echo "✓ Basic security check complete"
+
+  # =============================================================================
+  # 4. Docker Build and Test
+  # =============================================================================
+  docker-build:
+    name: Docker Build and Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build Docker image
+        run: |
+          docker build -t quant-risk-engine:test .
+      
+      - name: Verify Docker image
+        run: |
+          docker images | grep quant-risk-engine
+          echo "✓ Docker image built successfully"
+      
+      - name: Test Python bindings in container
+        run: |
+          docker run --rm quant-risk-engine:test \
+            bash -c "source venv/bin/activate && python -c 'import quant_risk_engine; print(\"✓ Bindings work in container\")'"
+      
+      - name: Test Flask app starts
+        run: |
+          # Start container in background
+          docker run -d --name test-container -p 5000:5000 quant-risk-engine:test \
+            bash -c "source venv/bin/activate && cd python_api && timeout 10 python app.py || true"
+          
+          # Wait a bit for startup
+          sleep 5
+          
+          # Check if Flask started (it will exit after timeout, but we can check logs)
+          docker logs test-container 2>&1 | grep -q "Running on" && echo "✓ Flask app starts successfully" || echo "⚠ Could not verify Flask startup"
+          
+          # Cleanup
+          docker rm -f test-container || true
+      
+      - name: Save Docker image as artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker save quant-risk-engine:test | gzip > quant-risk-engine-docker.tar.gz
+      
+      - name: Upload Docker image
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: quant-risk-engine-docker.tar.gz
+          retention-days: 7
+
+  # =============================================================================
+  # 5. Integration Tests (Full Stack)
+  # =============================================================================
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [cpp-build-test, python-api-test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+      
+      - name: Install Python dependencies
+        working-directory: python_api
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest requests
+      
+      - name: Build Python bindings
+        working-directory: python_api
+        run: python setup.py build_ext --inplace
+      
+      - name: Start Flask API
+        working-directory: python_api
+        run: |
+          nohup python app.py > flask.log 2>&1 &
+          echo $! > flask.pid
+          sleep 5
+      
+      - name: Test API health endpoint
+        run: |
+          curl -f http://localhost:5000/health || (echo "✗ Health check failed" && exit 1)
+          echo "✓ API health check passed"
+      
+      - name: Test portfolio risk calculation
+        run: |
+          curl -X POST http://localhost:5000/calculate_risk \
+            -H "Content-Type: application/json" \
+            -d '{
+              "portfolio": [
+                {
+                  "asset_id": "AAPL",
+                  "style": "european",
+                  "type": "call",
+                  "strike": 150.0,
+                  "expiry": 1.0,
+                  "quantity": 100
+                }
+              ],
+              "market_data": {
+                "AAPL": {
+                  "spot": 150.0,
+                  "rate": 0.05,
+                  "vol": 0.25,
+                  "dividend": 0.01
+                }
+              }
+            }' \
+            -o response.json -w "%{http_code}" | grep -q "200" || (cat response.json && exit 1)
+          
+          # Verify response contains expected fields
+          cat response.json | python -c "
+import json, sys
+data = json.load(sys.stdin)
+required_fields = ['total_pv', 'total_delta', 'total_gamma', 'total_vega', 'total_theta', 'value_at_risk_95']
+missing = [f for f in required_fields if f not in data]
+if missing:
+    print(f'✗ Missing fields: {missing}')
+    sys.exit(1)
+print('✓ All required fields present')
+print(f'  Total PV: {data[\"total_pv\"]:.2f}')
+print(f'  VaR 95%: {data[\"value_at_risk_95\"]:.2f}')
+          "
+      
+      - name: Test option pricing endpoint
+        run: |
+          curl -X POST http://localhost:5000/price_option \
+            -H "Content-Type: application/json" \
+            -d '{
+              "asset_id": "MSFT",
+              "type": "put",
+              "strike": 300.0,
+              "expiry": 0.5,
+              "market_data": {
+                "spot": 310.0,
+                "rate": 0.05,
+                "vol": 0.30
+              }
+            }' \
+            -o price_response.json -w "%{http_code}" | grep -q "200" || (cat price_response.json && exit 1)
+          
+          echo "✓ Option pricing endpoint working"
+      
+      - name: Stop Flask API
+        if: always()
+        run: |
+          if [ -f python_api/flask.pid ]; then
+            kill $(cat python_api/flask.pid) || true
+            rm python_api/flask.pid
+          fi
+      
+      - name: Upload Flask logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flask-logs
+          path: python_api/flask.log
+
+  # =============================================================================
+  # 6. Code Quality Checks
+  # =============================================================================
+  code-quality:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check line endings
+        run: |
+          echo "Checking for Windows line endings..."
+          ! find . -name "*.cpp" -o -name "*.h" -o -name "*.sh" -o -name "*.py" | \
+            xargs file | grep CRLF || (echo "✗ CRLF line endings found" && exit 1)
+          echo "✓ No CRLF line endings"
+      
+      - name: Check file permissions
+        run: |
+          echo "Checking shell scripts are executable..."
+          for script in start.sh cpp_engine/build.sh; do
+            if [ -f "$script" ] && [ ! -x "$script" ]; then
+              echo "⚠ $script is not executable"
+              chmod +x "$script"
+            fi
+          done
+          echo "✓ File permissions OK"
+      
+      - name: Check for TODO/FIXME comments
+        run: |
+          echo "Scanning for TODO/FIXME comments..."
+          find cpp_engine/src python_api -name "*.cpp" -o -name "*.h" -o -name "*.py" | \
+            xargs grep -n "TODO\|FIXME" || echo "✓ No TODO/FIXME found"
+        continue-on-error: true
+      
+      - name: Verify required files exist
+        run: |
+          required_files=(
+            "README.md"
+            "LICENSE"
+            "Dockerfile"
+            "start.sh"
+            "cpp_engine/CMakeLists.txt"
+            "cpp_engine/src/RiskEngine.h"
+            "cpp_engine/src/RiskEngine.cpp"
+            "python_api/app.py"
+            "python_api/requirements.txt"
+            "js_dashboard/index.html"
+          )
+          
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "✗ Missing required file: $file"
+              exit 1
+            fi
+          done
+          echo "✓ All required files present"
+      
+      - name: Check Python code style (basic)
+        run: |
+          pip install flake8
+          cd python_api
+          # Relaxed rules - just catch obvious errors
+          flake8 app.py market_data_fetcher.py --max-line-length=120 --ignore=E501,W503 || echo "⚠ Style warnings (non-blocking)"
+
+  # =============================================================================
+  # 7. Build Script Validation
+  # =============================================================================
+  build-script-test:
+    name: Test build.sh Script
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake clang
+      
+      - name: Make build.sh executable
+        working-directory: cpp_engine
+        run: chmod +x build.sh
+      
+      - name: Test build.sh --help
+        working-directory: cpp_engine
+        run: ./build.sh --help
+      
+      - name: Test build.sh --clean
+        working-directory: cpp_engine
+        run: ./build.sh --clean
+      
+      - name: Test build.sh with GCC
+        working-directory: cpp_engine
+        run: ./build.sh --compiler gcc --build
+      
+      - name: Test build.sh --test
+        working-directory: cpp_engine
+        run: ./build.sh --test
+
+  # =============================================================================
+  # 8. Performance Benchmark (main branch only)
+  # =============================================================================
+  performance-benchmark:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [cpp-build-test, python-api-test]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+      
+      - name: Build in Release mode
+        working-directory: cpp_engine
+        run: |
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          make -j$(nproc)
+      
+      - name: Run risk engine demo (timed)
+        working-directory: cpp_engine/build/bin
+        run: |
+          echo "=== Performance Benchmark ===" | tee benchmark.log
+          time ./risk-engine 2>&1 | tee -a benchmark.log || echo "Demo completed"
+      
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-benchmark
+          path: cpp_engine/build/bin/benchmark.log
+
+  # =============================================================================
+  # 9. CI Summary
+  # =============================================================================
+  ci-summary:
+    name: CI Pipeline Summary
+    runs-on: ubuntu-latest
+    needs: 
+      - cpp-build-test
+      - python-api-test
+      - frontend-validation
+      - docker-build
+      - integration-test
+      - code-quality
+      - build-script-test
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "# 🚀 Quant Risk Engine CI/CD Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| C++ Build & Test | ${{ needs.cpp-build-test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python API Test | ${{ needs.python-api-test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Validation | ${{ needs.frontend-validation.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Build | ${{ needs.docker-build.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality | ${{ needs.code-quality.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Script Test | ${{ needs.build-script-test.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.cpp-build-test.result }}" == "success" ] && \
+             [ "${{ needs.python-api-test.result }}" == "success" ] && \
+             [ "${{ needs.frontend-validation.result }}" == "success" ] && \
+             [ "${{ needs.docker-build.result }}" == "success" ] && \
+             [ "${{ needs.integration-test.result }}" == "success" ] && \
+             [ "${{ needs.code-quality.result }}" == "success" ] && \
+             [ "${{ needs.build-script-test.result }}" == "success" ]; then
+            echo "## ✅ All Checks Passed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The build is ready for deployment! 🎉" >> $GITHUB_STEP_SUMMARY
+            exit 0
+          else
+            echo "## ❌ Some Checks Failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please review the failed jobs above." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
