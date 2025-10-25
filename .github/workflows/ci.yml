@@ -346,34 +346,34 @@ jobs:
             }' \
             -s -o response.json -w "%{http_code}" > http_code.txt
           
-         # Check HTTP status code
-           HTTP_CODE=$(cat http_code.txt)
-           echo "HTTP Status Code: $HTTP_CODE"
+          # Check HTTP status code
+          HTTP_CODE=$(cat http_code.txt)
+          echo "HTTP Status Code: $HTTP_CODE"
           
-           if [ "$HTTP_CODE" != "200" ]; then
-             echo "✗ Request failed with status $HTTP_CODE"
-             cat response.json
-             exit 1
-           fi
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "✗ Request failed with status $HTTP_CODE"
+            cat response.json
+            exit 1
+          fi
           
-           # Verify response contains expected fields
-           echo "Validating response..."
-           cat response.json
+          # Verify response contains expected fields
+          echo "Validating response..."
+          cat response.json
           
-           if grep -q "\"error\"" response.json; then
-             echo "✗ API returned an error"
-             cat response.json
-             exit 1
-           fi
+          if grep -q "\"error\"" response.json; then
+            echo "✗ API returned an error"
+            cat response.json
+            exit 1
+          fi
           
-           # Check for key fields (simplified check)
-           if ! grep -q "\"total_pv\"" response.json; then
-             echo "✗ Missing total_pv in response"
-             exit 1
-           fi
+          # Check for key fields (simplified check)
+          if ! grep -q "\"total_pv\"" response.json; then
+            echo "✗ Missing total_pv in response"
+            exit 1
+          fi
           
-           echo "✓ Portfolio risk calculation successful"
-       
+          echo "✓ Portfolio risk calculation successful"          
+ 
       - name: Test option pricing endpoint
         run: |
           curl -X POST http://localhost:5000/price_option \
