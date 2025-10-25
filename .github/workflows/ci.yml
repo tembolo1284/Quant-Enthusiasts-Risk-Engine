@@ -37,11 +37,13 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake clang libc++-dev libc++abi-dev
+          sudo apt-get install -y build-essential cmake clang libc++-dev libc++abi-dev python3-pybind11
       
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
-        run: brew install cmake
+        run: |
+          brew install cmake
+          brew install pybind11
       
       - name: Set compiler
         run: |
