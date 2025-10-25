@@ -1,6 +1,8 @@
-#!/usr/bin/env bash
+#!/bin/bash
+
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Change to the cpp_engine directory (where this script lives)
 cd "$SCRIPT_DIR"
 
@@ -100,18 +102,6 @@ run_tests() {
     
     cd "$BUILD_DIR"
     
-    # Look for test executables in both build root and tests subdirectory
-    find_test_executable() {
-        local test_name=$1
-        if [ -f "./$test_name" ]; then
-            echo "./$test_name"
-        elif [ -f "./tests/$test_name" ]; then
-            echo "./tests/$test_name"
-        else
-            echo ""
-        fi
-    }
-    
     case "$TEST_NAME" in
         "all"|"")
             echo -e "${YELLOW}Running all tests...${NC}"
@@ -120,26 +110,23 @@ run_tests() {
             PORT_RESULT=0
             RE_RESULT=0
             
-            TEST_BS=$(find_test_executable "test_blackscholes")
-            if [ -n "$TEST_BS" ]; then
+            if [ -f "./test_blackscholes" ]; then
                 echo -e "${YELLOW}=== BlackScholes Tests ===${NC}"
-                $TEST_BS
+                ./test_blackscholes
                 BS_RESULT=$?
             fi
             echo ""
             
-            TEST_PORT=$(find_test_executable "test_portfolio")
-            if [ -n "$TEST_PORT" ]; then
+            if [ -f "./test_portfolio" ]; then
                 echo -e "${YELLOW}=== Portfolio Tests ===${NC}"
-                $TEST_PORT
+                ./test_portfolio
                 PORT_RESULT=$?
             fi
             echo ""
             
-            TEST_RE=$(find_test_executable "test_risk_engine")
-            if [ -n "$TEST_RE" ]; then
+            if [ -f "./test_risk_engine" ]; then
                 echo -e "${YELLOW}=== RiskEngine Tests ===${NC}"
-                $TEST_RE
+                ./test_risk_engine
                 RE_RESULT=$?
             fi
             echo ""
@@ -154,9 +141,8 @@ run_tests() {
             ;;
         "blackscholes")
             echo -e "${YELLOW}Running BlackScholes tests...${NC}"
-            TEST_EXEC=$(find_test_executable "test_blackscholes")
-            if [ -n "$TEST_EXEC" ]; then
-                $TEST_EXEC
+            if [ -f "./test_blackscholes" ]; then
+                ./test_blackscholes
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}✓ BlackScholes tests passed${NC}"
                 else
@@ -172,9 +158,8 @@ run_tests() {
             ;;
         "portfolio")
             echo -e "${YELLOW}Running Portfolio tests...${NC}"
-            TEST_EXEC=$(find_test_executable "test_portfolio")
-            if [ -n "$TEST_EXEC" ]; then
-                $TEST_EXEC
+            if [ -f "./test_portfolio" ]; then
+                ./test_portfolio
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}✓ Portfolio tests passed${NC}"
                 else
@@ -190,9 +175,8 @@ run_tests() {
             ;;
         "risk_engine")
             echo -e "${YELLOW}Running RiskEngine tests...${NC}"
-            TEST_EXEC=$(find_test_executable "test_risk_engine")
-            if [ -n "$TEST_EXEC" ]; then
-                $TEST_EXEC
+            if [ -f "./test_risk_engine" ]; then
+                ./test_risk_engine
                 if [ $? -eq 0 ]; then
                     echo -e "${GREEN}✓ RiskEngine tests passed${NC}"
                 else
