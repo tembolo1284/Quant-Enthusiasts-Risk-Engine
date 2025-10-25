@@ -247,7 +247,7 @@ jobs:
       - name: Test Python bindings in container
         run: |
           docker run --rm quant-risk-engine:test \
-            bash -c "source venv/bin/activate && python -c 'import quant_risk_engine; print(\"✓ Bindings work in container\")'"
+            bash -c "source venv/bin/activate && python -c 'import quant_risk_engine; print(\"Module:\", quant_risk_engine.__file__); print(\"✓ Bindings work in container\")'"
       
       - name: Test Flask app starts
         run: |
