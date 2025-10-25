@@ -14,7 +14,7 @@ cd python_api
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
     echo "Creating Python virtual environment..."
-    python -m venv venv
+    python3 -m venv venv
 fi
 
 # Activate virtual environment
@@ -25,7 +25,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # Build Python bindings
-python setup.py build_ext --inplace
+python3 setup.py build_ext --inplace
 
 # Start Python API in background
 echo "Launching Python API..."
