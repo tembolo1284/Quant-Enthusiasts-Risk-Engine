@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import quant_risk_engine
 import traceback
@@ -197,9 +197,12 @@ def create_option(item: Dict[str, Any]) -> Any:
     
     return option
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DASHBOARD_DIR = os.path.join(BASE_DIR, "..", "js_dashboard")
+
 @app.route("/")
 def serve_dashboard():
-    return send_from_directory(app.static_folder, "index.html")
+    return send_from_directory(DASHBOARD_DIR, "index.html")
 
 @app.route('/update_market_data', methods=['POST'])
 def update_market_data():
