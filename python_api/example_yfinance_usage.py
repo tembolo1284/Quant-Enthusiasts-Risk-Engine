@@ -9,7 +9,7 @@ import json
 from typing import List, Dict
 
 # API Configuration
-API_BASE_URL = "http://127.0.0.1:5000"
+API_BASE_URL = "http://0.0.0.0:5000"
 
 
 def example_1_basic_fetch():
