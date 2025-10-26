@@ -9,7 +9,7 @@ import json
 from typing import List, Dict
 
 # API Configuration
-API_BASE_URL = "http://0.0.0.0:5000"
+API_BASE_URL = "https://quant-enthusiasts-risk-engine.onrender.com"
 
 
 def example_1_basic_fetch():
@@ -38,7 +38,7 @@ def main():
     print("=" * 70)
     print("YFINANCE MARKET DATA INTEGRATION - USAGE EXAMPLES")
     print("=" * 70)
-    print("\nMake sure the Flask API is running on http://127.0.0.1:5000\n")
+    print("\nMake sure the Flask API is running on {API_BASE_URL}\n")
     
     try:
         # Check API health
