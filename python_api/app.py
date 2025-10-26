@@ -197,6 +197,10 @@ def create_option(item: Dict[str, Any]) -> Any:
     
     return option
 
+@app.route("/")
+def serve_dashboard():
+    return send_from_directory(app.static_folder, "index.html")
+
 @app.route('/update_market_data', methods=['POST'])
 def update_market_data():
     """
