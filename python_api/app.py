@@ -412,7 +412,6 @@ def calculate_risk():
         # Calculate risk
         engine = quant_risk_engine.RiskEngine()
         engine.set_var_simulations(var_config['simulations'])
-        engine.set_var_confidence_level(var_config['confidence'])
         engine.set_var_time_horizon_days(var_config['time_horizon'])
         
         if var_config['seed'] is not None:
