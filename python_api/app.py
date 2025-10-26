@@ -5,6 +5,8 @@ import traceback
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from market_data_fetcher import get_market_data_fetcher, MarketDataCache
+import os
+
 
 app = Flask(__name__)
 CORS(app)
