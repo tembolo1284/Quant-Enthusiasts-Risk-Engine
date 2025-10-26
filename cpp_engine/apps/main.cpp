@@ -7,10 +7,10 @@
 #include <string>
 #include <algorithm>
 
-#include "Portfolio.h"
-#include "Instrument.h"
-#include "MarketData.h"
-#include "RiskEngine.h"
+#include "../libraries/qe_risk_engine/includes/Portfolio.h"
+#include "../libraries/qe_risk_engine/includes/Instrument.h"
+#include "../libraries/qe_risk_engine/includes/MarketData.h"
+#include "../libraries/qe_risk_engine/includes/RiskEngine.h"
 
 void printSeparator(char c = '=', int width = 70) {
     std::cout << std::string(width, c) << std::endl;
