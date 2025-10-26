@@ -16,7 +16,7 @@ ext_modules = [
             '../cpp_engine/libraries/qe_risk_engine/src/JumpDiffusion.cpp',
             '../cpp_engine/libraries/qe_risk_engine/src/ImpliedVolatilitySurface.cpp',
             '../cpp_engine/libraries/qe_risk_engine/src/MarketData.cpp',
-            "../cpp_engine/libraries/qe_risk_engine/src/Instruments.cpp"
+            "../cpp_engine/libraries/qe_risk_engine/src/Instrument.cpp"
         ],
         include_dirs=[
             pybind11.get_include(),
