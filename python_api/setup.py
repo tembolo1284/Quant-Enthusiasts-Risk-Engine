@@ -22,7 +22,8 @@ ext_modules = [
             '../cpp_engine/src',
             '../cpp_engine/src/utils',
             '../cpp_engine/libraries/qe_risk_engine/src',
-            '../cpp_engine/libraries/qe_risk_engine/src/utils'
+            '../cpp_engine/libraries/qe_risk_engine/src/utils',
+            '../cpp_engine/libraries/qe_risk_engine/includes'
         ],
         language='c++',
         extra_compile_args=cpp_args,
