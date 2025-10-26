@@ -27,11 +27,6 @@ pip install -r requirements.txt
 # Build Python bindings
 python3 setup.py build_ext --inplace
 
-# Start Python API in background
-echo "Launching Python API..."
-python app.py &
-API_PID=$!
-
 cd ..
 
 # -----------------------------
@@ -48,17 +43,12 @@ fi
 # Start local server
 echo "Launching JS Dashboard..."
 npx serve . -p 3000 &
-DASHBOARD_PID=$!
 
 cd ..
 
 # -----------------------------
-# 3. Completion message
+# 3. Launch API in foreground
 # -----------------------------
-echo "Quant Enthusiasts Risk Engine started successfully!"
-echo "Python API running at http://127.0.0.1:5000"
-echo "JS Dashboard running at http://127.0.0.1:3000"
-echo "Press Ctrl+C to stop."
-
-# Wait for background processes
-wait $API_PID $DASHBOARD_PID
+echo "Launching Python API..."
+cd python_api
+exec python app.py
